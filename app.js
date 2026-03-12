@@ -5,7 +5,7 @@
 // --- Configuration & State ---
 const CONFIG = {
     // Replace with your Google Apps Script Web App URL after deployment
-    API_URL: 'https://script.google.com/macros/s/AKfycbz1NfGe3ie8q4CXqjz8MUGLzHzfaMRYVaEiu5OkvfsHmX93xyqTgpI9lL2p6p5E6DfV5Q/exec',
+    API_URL: 'https://script.google.com/macros/s/AKfycbzgkyLoyh6EQazlJU1IZi1CsEbAGGWeOZizjcum85BKs67i-Mxai5c3ZIbrFPmfvskhlA/exec',
     CURRENCY: 'Rp'
 };
 
