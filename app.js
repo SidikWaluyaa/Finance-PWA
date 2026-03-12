@@ -313,9 +313,12 @@ function renderBudgetInfo() {
         const el = document.createElement('div');
         el.className = 'budget-item';
         el.innerHTML = `
-            <div class="budget-label">
+            <div class="budget-label" style="align-items: center;">
                 <span>${cat.charAt(0).toUpperCase() + cat.slice(1)}</span>
-                <span>${formatCurrency(spent)} / ${formatCurrency(limit)}</span>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <span>${formatCurrency(spent)} / ${formatCurrency(limit)}</span>
+                    <button onclick="deleteBudget('${cat}')" class="btn-icon-xs btn-delete">🗑️</button>
+                </div>
             </div>
             <div class="progress-bar">
                 <div class="progress-fill" style="width: ${percent}%; background: ${color}"></div>
@@ -333,6 +336,15 @@ function saveBudget() {
         state.budgets[cat] = limit;
         localStorage.setItem('budgets', JSON.stringify(state.budgets));
         showToast(`Budget ${cat} disimpan!`);
+        updateUI();
+    }
+}
+
+function deleteBudget(category) {
+    if (confirm(`Hapus anggaran untuk kategori ${category}?`)) {
+        delete state.budgets[category];
+        localStorage.setItem('budgets', JSON.stringify(state.budgets));
+        showToast(`Budget ${category} dihapus!`);
         updateUI();
     }
 }
