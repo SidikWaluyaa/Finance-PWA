@@ -9,10 +9,10 @@ function doGet(e) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(SHEET_NAME);
   
-  if (!sheet) {
-    sheet = ss.insertSheet(SHEET_NAME);
-    sheet.appendRow(['ID', 'Tanggal', 'Jenis', 'Kategori', 'Nominal', 'Catatan', 'Timestamp']);
-  }
+    if (!sheet) {
+      sheet = ss.insertSheet(SHEET_NAME);
+      sheet.appendRow(['ID', 'Tanggal', 'Jenis', 'Kategori', 'Nominal', 'Dompet', 'Catatan', 'Timestamp']);
+    }
 
   if (action === 'getTransactions') {
     const data = sheet.getDataRange().getValues();
@@ -35,7 +35,7 @@ function doPost(e) {
     
     if (!sheet) {
       sheet = ss.insertSheet(SHEET_NAME);
-      sheet.appendRow(['ID', 'Tanggal', 'Jenis', 'Kategori', 'Nominal', 'Catatan', 'Timestamp']);
+      sheet.appendRow(['ID', 'Tanggal', 'Jenis', 'Kategori', 'Nominal', 'Dompet', 'Catatan', 'Timestamp']);
     }
 
     const action = data.action;
@@ -43,7 +43,8 @@ function doPost(e) {
     if (action === 'addTransaction') {
       const id = new Date().getTime();
       const timestamp = new Date();
-      sheet.appendRow([id, data.tanggal, data.jenis, data.kategori, data.nominal, data.catatan, timestamp]);
+      const dompet = data.dompet || 'Tunai';
+      sheet.appendRow([id, data.tanggal, data.jenis, data.kategori, data.nominal, dompet, data.catatan, timestamp]);
       return ContentService.createTextOutput(JSON.stringify({ status: 'success', id: id }))
         .setMimeType(ContentService.MimeType.JSON);
     } 
@@ -55,13 +56,14 @@ function doPost(e) {
       
       for (let i = 1; i < values.length; i++) {
         if (values[i][0] == idToUpdate) {
-          // Update columns: Tanggal, Jenis, Kategori, Nominal, Catatan
+          // Update columns: Tanggal, Jenis, Kategori, Nominal, Dompet, Catatan
           sheet.getRange(i + 1, 2).setValue(data.tanggal);
           sheet.getRange(i + 1, 3).setValue(data.jenis);
           sheet.getRange(i + 1, 4).setValue(data.kategori);
           sheet.getRange(i + 1, 5).setValue(data.nominal);
-          sheet.getRange(i + 1, 6).setValue(data.catatan);
-          sheet.getRange(i + 1, 7).setValue(new Date()); // Update timestamp
+          sheet.getRange(i + 1, 6).setValue(data.dompet || 'Tunai');
+          sheet.getRange(i + 1, 7).setValue(data.catatan);
+          sheet.getRange(i + 1, 8).setValue(new Date()); // Update timestamp
           return ContentService.createTextOutput(JSON.stringify({ status: 'success' }))
             .setMimeType(ContentService.MimeType.JSON);
         }

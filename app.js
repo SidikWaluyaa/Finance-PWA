@@ -28,7 +28,8 @@ let state = {
     budgets: JSON.parse(localStorage.getItem('budgets')) || {},
     editingId: null,
     savingsGoals: JSON.parse(localStorage.getItem('savingsGoals')) || [],
-    dateFilter: new Date().toISOString().slice(0, 7)
+    dateFilter: new Date().toISOString().slice(0, 7),
+    wallets: JSON.parse(localStorage.getItem('wallets')) || ['Tunai', 'BCA', 'GoPay']
 };
 
 // --- Initialization ---
@@ -46,6 +47,8 @@ document.addEventListener('DOMContentLoaded', () => {
     window.deleteGoal = deleteGoal;
     window.saveGoal = saveGoal;
     window.saveBudget = saveBudget;
+    window.addWallet = addWallet;
+    window.deleteWallet = deleteWallet;
     
     // Custom Actions
     const refreshBtn = document.getElementById('force-refresh-btn');
@@ -157,6 +160,7 @@ function initForms() {
                 jenis: document.getElementById('t-type').value,
                 kategori: document.getElementById('t-category').value,
                 nominal: parseFloat(document.getElementById('t-amount').value),
+                dompet: document.getElementById('t-wallet').value || 'Tunai',
                 catatan: document.getElementById('t-note').value
             };
 
@@ -204,8 +208,12 @@ function cancelEdit() {
     const form = document.getElementById('transaction-form');
     if (form) form.reset();
     
+    // Set default date and wallet
     const dateInput = document.getElementById('t-date');
     if (dateInput) dateInput.valueAsDate = new Date();
+    
+    const walletInput = document.getElementById('t-wallet');
+    if (walletInput && state.wallets.length > 0) walletInput.value = state.wallets[0];
     
     document.getElementById('form-title').textContent = 'Tambah Transaksi';
     document.getElementById('submit-btn').textContent = 'Simpan Transaksi';
@@ -244,13 +252,31 @@ function updateUI() {
     renderTransactionList();
     renderBudgetInfo();
     renderSavingsGoals();
+    renderWallets();
     updateCharts();
 }
 
 function calculateSummary() {
-    // Total Saldo (All-Time)
-    const allInc = state.transactions.filter(t => t.jenis === 'pemasukan').reduce((s, t) => s + (parseFloat(t.nominal) || 0), 0);
-    const allExp = state.transactions.filter(t => t.jenis === 'pengeluaran').reduce((s, t) => s + (parseFloat(t.nominal) || 0), 0);
+    // Balances per wallet (All-Time)
+    const walletBalances = {};
+    state.wallets.forEach(w => walletBalances[w] = 0);
+    
+    let allInc = 0;
+    let allExp = 0;
+
+    state.transactions.forEach(t => {
+        const nominal = parseFloat(t.nominal) || 0;
+        const dompet = t.dompet || 'Tunai';
+        if (!walletBalances[dompet]) walletBalances[dompet] = 0;
+
+        if (t.jenis === 'pemasukan') {
+            allInc += nominal;
+            walletBalances[dompet] += nominal;
+        } else if (t.jenis === 'pengeluaran') {
+            allExp += nominal;
+            walletBalances[dompet] -= nominal;
+        }
+    });
     
     // Income and Expense (Filtered by Month)
     const txs = getFilteredTransactions();
@@ -260,6 +286,21 @@ function calculateSummary() {
     document.getElementById('total-balance').textContent = formatCurrency(allInc - allExp);
     document.getElementById('total-income').textContent = formatCurrency(sumInc);
     document.getElementById('total-expense').textContent = formatCurrency(sumExp);
+
+    // Render Mini Wallet Cards on Dashboard
+    const walletContainer = document.getElementById('wallet-balances');
+    if (walletContainer) {
+        walletContainer.innerHTML = '';
+        state.wallets.forEach(w => {
+            const bal = walletBalances[w] || 0;
+            walletContainer.innerHTML += `
+                <div style="min-width: 140px; padding: 0.8rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; flex-shrink: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 2px;">${w}</div>
+                    <div style="font-size: 1rem; font-weight: 700; color: ${bal < 0 ? 'var(--expense)' : 'var(--text)'};">${formatCurrency(bal)}</div>
+                </div>
+            `;
+        });
+    }
 }
 
 function renderTransactionList(query = '') {
@@ -478,6 +519,69 @@ function deleteGoal(index) {
         state.savingsGoals.splice(index, 1);
         localStorage.setItem('savingsGoals', JSON.stringify(state.savingsGoals));
         showToast(`Target dihapus!`);
+        updateUI();
+    }
+}
+
+function renderWallets() {
+    // 1. Render Wallet List in Settings (Profil)
+    const walletList = document.getElementById('wallet-list');
+    if (walletList) {
+        walletList.innerHTML = '';
+        state.wallets.forEach((w, index) => {
+            const el = document.createElement('div');
+            el.className = 'setting-item';
+            el.innerHTML = `
+                <span style="font-weight: 500;">${w}</span>
+                <button class="btn-icon-xs btn-delete" style="padding: 0; width: 28px; height: 28px;" title="Hapus Dompet" onclick="deleteWallet(${index})">🗑️</button>
+            `;
+            walletList.appendChild(el);
+        });
+    }
+
+    // 2. Render Wallet Dropdown in Transaction Form
+    const walletSelect = document.getElementById('t-wallet');
+    if (walletSelect) {
+        const currentVal = walletSelect.value;
+        walletSelect.innerHTML = '';
+        state.wallets.forEach(w => {
+            const opt = document.createElement('option');
+            opt.value = w;
+            opt.textContent = w;
+            walletSelect.appendChild(opt);
+        });
+        if (state.wallets.includes(currentVal)) {
+            walletSelect.value = currentVal;
+        } else if (state.wallets.length > 0) {
+            walletSelect.value = state.wallets[0];
+        }
+    }
+}
+
+function addWallet() {
+    const nameInput = document.getElementById('new-wallet-name');
+    const name = nameInput.value.trim();
+    if (name && !state.wallets.includes(name)) {
+        state.wallets.push(name);
+        localStorage.setItem('wallets', JSON.stringify(state.wallets));
+        nameInput.value = '';
+        showToast(`Dompet ${name} ditambahkan!`);
+        updateUI();
+    } else if (state.wallets.includes(name)) {
+        showToast(`Dompet ${name} sudah ada!`);
+    }
+}
+
+function deleteWallet(index) {
+    if (state.wallets.length <= 1) {
+        alert("Minimal harus ada 1 dompet tersisa!");
+        return;
+    }
+    const walletName = state.wallets[index];
+    if (confirm(`Apakah Anda yakin ingin menghapus dompet "${walletName}"? Transaksi lama dengan dompet ini tetap ada, namun dompetnya tidak tersedia lagi untuk transaksi baru.`)) {
+        state.wallets.splice(index, 1);
+        localStorage.setItem('wallets', JSON.stringify(state.wallets));
+        showToast(`Dompet ${walletName} dihapus!`);
         updateUI();
     }
 }

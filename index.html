@@ -34,9 +34,15 @@
                 </div>
                 <div class="summary-cards">
                     <div class="card primary-card">
-                        <span class="label">Total Saldo</span>
+                        <span class="label">Total Saldo (Semua Dompet)</span>
                         <h2 id="total-balance">Rp 0</h2>
                     </div>
+                    
+                    <!-- Wallet Balances -->
+                    <div id="wallet-balances" style="display: flex; gap: 10px; overflow-x: auto; padding-bottom: 5px; margin-bottom: 1rem; width: 100%;">
+                        <!-- Wallet cards will be injected here -->
+                    </div>
+
                     <div class="stats-row">
                         <div class="card income-card">
                             <span class="label">Pemasukan</span>
@@ -114,6 +120,12 @@
                             </select>
                         </div>
                         <div class="form-group">
+                            <label>Dompet</label>
+                            <select id="t-wallet" required>
+                                <!-- Wallets injected here -->
+                            </select>
+                        </div>
+                        <div class="form-group">
                             <label>Nominal</label>
                             <input type="number" id="t-amount" placeholder="0" required>
                         </div>
@@ -184,6 +196,17 @@
                     </div>
                 </div>
                 
+                <div class="card">
+                    <h3>Kelola Dompet (Wallets)</h3>
+                    <div id="wallet-list" style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                        <!-- Wallet items injected here -->
+                    </div>
+                    <div class="form-group" style="margin-top: 1rem;">
+                        <input type="text" id="new-wallet-name" placeholder="Tambah dompet baru (misal: BCA, OVO)" required>
+                        <button class="btn btn-secondary" style="margin-top: 0.5rem;" onclick="addWallet()">Tambah Dompet</button>
+                    </div>
+                </div>
+
                 <div class="card settings-list">
                     <div class="setting-item" style="flex-direction: column; align-items: flex-start; gap: 0.5rem;">
                         <div style="display: flex; justify-content: space-between; width: 100%;">
