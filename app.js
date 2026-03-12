@@ -38,6 +38,11 @@ document.addEventListener('DOMContentLoaded', () => {
     initCharts();
     loadData();
     
+    // Global functions for inline onclick handlers
+    window.deleteBudget = deleteBudget;
+    window.editTransaction = editTransaction;
+    window.deleteTransaction = deleteTransaction;
+    
     // Custom Actions
     const refreshBtn = document.getElementById('force-refresh-btn');
     if (refreshBtn) {
