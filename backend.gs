@@ -10,6 +10,7 @@
  */
 
 const SHEET_NAME = 'Transaksi';
+const DRIVE_FOLDER_NAME = 'MyFinance Receipts';
 
 function doGet(e) {
   const action = e.parameter.action;
@@ -18,7 +19,7 @@ function doGet(e) {
   
   if (!sheet) {
     sheet = ss.insertSheet(SHEET_NAME);
-    sheet.appendRow(['ID', 'Tanggal', 'Jenis', 'Kategori', 'Nominal', 'Catatan', 'Timestamp']);
+    sheet.appendRow(['ID', 'Tanggal', 'Jenis', 'Kategori', 'Nominal', 'Catatan', 'Foto', 'Timestamp']);
   }
 
   if (action === 'getTransactions') {
@@ -35,38 +36,60 @@ function doGet(e) {
 }
 
 function doPost(e) {
-  const data = JSON.parse(e.postData.contents);
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(SHEET_NAME);
-  
-  if (!sheet) {
-    sheet = ss.insertSheet(SHEET_NAME);
-    sheet.appendRow(['ID', 'Tanggal', 'Jenis', 'Kategori', 'Nominal', 'Catatan', 'Timestamp']);
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName(SHEET_NAME);
+    
+    if (!sheet) {
+      sheet = ss.insertSheet(SHEET_NAME);
+      sheet.appendRow(['ID', 'Tanggal', 'Jenis', 'Kategori', 'Nominal', 'Catatan', 'Foto', 'Timestamp']);
+    }
+
+    let photoUrl = '';
+    if (data.image) {
+      photoUrl = uploadToDrive(data.image, `Receipt_${new Date().getTime()}.jpg`);
+    }
+
+    const id = new Date().getTime();
+    const timestamp = new Date();
+    
+    sheet.appendRow([
+      id,
+      data.tanggal,
+      data.jenis,
+      data.kategori,
+      data.nominal,
+      data.catatan,
+      photoUrl,
+      timestamp
+    ]);
+
+    return ContentService.createTextOutput(JSON.stringify({ status: 'success', id: id, photoUrl: photoUrl }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
   }
-
-  const id = new Date().getTime();
-  const timestamp = new Date();
-  
-  sheet.appendRow([
-    id,
-    data.tanggal,
-    data.jenis,
-    data.kategori,
-    data.nominal,
-    data.catatan,
-    timestamp
-  ]);
-
-  return ContentService.createTextOutput(JSON.stringify({ status: 'success', id: id }))
-    .setMimeType(ContentService.MimeType.JSON);
 }
 
-// Special function to handle receipt upload to Drive if needed
 function uploadToDrive(base64Data, filename) {
-  const folder = DriveApp.getFoldersByName('MyFinance Receipts').next();
+  let folder;
+  const folders = DriveApp.getFoldersByName(DRIVE_FOLDER_NAME);
+  
+  if (folders.hasNext()) {
+    folder = folders.next();
+  } else {
+    folder = DriveApp.createFolder(DRIVE_FOLDER_NAME);
+  }
+
   const contentType = base64Data.substring(5, base64Data.indexOf(';'));
   const bytes = Utilities.base64Decode(base64Data.split(',')[1]);
   const blob = Utilities.newBlob(bytes, contentType, filename);
-  folder.createFile(blob);
-  return { status: 'success' };
+  const file = folder.createFile(blob);
+  
+  // Make file readable by anyone with the link so it can be previewed
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  
+  return file.getUrl();
 }

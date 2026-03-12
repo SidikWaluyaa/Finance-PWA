@@ -80,51 +80,8 @@ function initNavigation() {
 
 // --- Form Handling ---
 function initForms() {
-    const form = document.getElementById('transaction-form');
     // Set default date to today
     document.getElementById('t-date').valueAsDate = new Date();
-
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const formData = {
-            action: 'addTransaction',
-            tanggal: document.getElementById('t-date').value,
-            jenis: document.getElementById('t-type').value,
-            kategori: document.getElementById('t-category').value,
-            nominal: parseFloat(document.getElementById('t-amount').value),
-            catatan: document.getElementById('t-note').value
-        };
-
-        showToast('Menyimpan transaksi...');
-        
-        try {
-            // Optimistic Update (Local UI)
-            const newT = { ...formData, id: Date.now(), timestamp: new Date().toISOString() };
-            state.transactions.unshift(newT);
-            updateUI();
-            form.reset();
-            document.getElementById('t-date').valueAsDate = new Date();
-
-            // Actual API Call
-            if (CONFIG.API_URL.includes('REPLACE_WITH_YOUR_SCRIPT_ID')) {
-                console.warn('API URL not configured. Data saved locally only.');
-                showToast('Tersimpan secara lokal (API belum dikonfigurasi)');
-            } else {
-                const response = await fetch(CONFIG.API_URL, {
-                    method: 'POST',
-                    body: JSON.stringify(formData)
-                });
-                const result = await response.json();
-                if (result.status === 'success') {
-                    showToast('Transaksi berhasil disimpan!');
-                }
-            }
-        } catch (error) {
-            console.error('Error saving transaction:', error);
-            showToast('Gagal menyimpan ke server, data tersimpan di cache.');
-        }
-    });
 
     // Search & Filter
     document.getElementById('search-input').addEventListener('input', (e) => {
@@ -312,17 +269,154 @@ function showToast(message) {
     setTimeout(() => toast.classList.add('hidden'), 3000);
 }
 
-// --- Camera Logic Placeholder ---
-document.getElementById('capture-btn').addEventListener('click', () => {
-    showToast('Membuka kamera...');
-    // In a real device, you'd use navigator.mediaDevices.getUserMedia
-    // For this PWA, we'll suggest the file upload for better compatibility
-    document.getElementById('upload-receipt').click();
-});
+// --- Camera & Scan Logic ---
+let cameraStream = null;
 
-document.getElementById('upload-receipt').addEventListener('change', (e) => {
-    if (e.target.files.length > 0) {
-        showToast('Foto berhasil dipilih!');
-        // Logic to upload to Drive via Apps Script would go here
+async function startCamera() {
+    const modal = document.getElementById('camera-modal');
+    const video = document.getElementById('camera-stream');
+    
+    try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: 'environment' }, 
+            audio: false 
+        });
+        video.srcObject = cameraStream;
+        modal.classList.add('active');
+    } catch (err) {
+        console.error("Camera error:", err);
+        showToast("Browser tidak mengizinkan akses kamera.");
     }
+}
+
+function stopCamera() {
+    const modal = document.getElementById('camera-modal');
+    const video = document.getElementById('camera-stream');
+    
+    if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+    }
+    video.srcObject = null;
+    modal.classList.remove('active');
+}
+
+async function capturePhoto() {
+    const video = document.getElementById('camera-stream');
+    const canvas = document.getElementById('capture-canvas');
+    const context = canvas.getContext('2d');
+
+    // Match canvas size to video frame
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const base64Image = canvas.toDataURL('image/jpeg', 0.8);
+    stopCamera();
+    
+    // Switch to Transaction section and pre-fill photo
+    showToast("Mengunggah struk...");
+    processScanResult(base64Image);
+}
+
+function processScanResult(base64Image) {
+    // Navigate to transaction form
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(i => i.classList.remove('active'));
+    document.querySelector('[data-section="transaksi"]').classList.add('active');
+    
+    document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
+    document.getElementById('section-transaksi').classList.add('active');
+    state.activeSection = 'transaksi';
+
+    // Store image base64 in a hidden way or global state for next submit
+    state.pendingImage = base64Image;
+    showToast("Struk diproses! Silakan isi detail transaksi.");
+}
+
+// Update existing form submission to include image
+// (Replacing the submit handler in initForms)
+function attachSubmitHandler() {
+    const form = document.getElementById('transaction-form');
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const formData = {
+            action: 'addTransaction',
+            tanggal: document.getElementById('t-date').value,
+            jenis: document.getElementById('t-type').value,
+            kategori: document.getElementById('t-category').value,
+            nominal: parseFloat(document.getElementById('t-amount').value),
+            catatan: document.getElementById('t-note').value,
+            image: state.pendingImage || null
+        };
+
+        showToast('Menyimpan transaksi...');
+        
+        try {
+            if (CONFIG.API_URL.includes('REPLACE_WITH_YOUR_SCRIPT_ID')) {
+                showToast('Tersimpan secara lokal (Harap konfigurasi API URL)');
+                // Mock success for local UI
+                state.transactions.unshift({ ...formData, id: Date.now(), foto: formData.image ? 'local_preview' : '' });
+            } else {
+                const response = await fetch(CONFIG.API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(formData)
+                });
+                const result = await response.json();
+                if (result.status === 'success') {
+                    showToast('Berhasil disimpan dengan foto!');
+                    loadData(); // Refresh from server
+                }
+            }
+            state.pendingImage = null; // Clear after use
+            form.reset();
+            document.getElementById('t-date').valueAsDate = new Date();
+            updateUI();
+        } catch (error) {
+            console.error('Error:', error);
+            showToast('Gagal terhubung ke server.');
+        }
+    });
+}
+
+// Update renderTransactionList to show Photo link if exists
+function renderTransactionList(query = '') {
+    const list = document.getElementById('transaction-list');
+    list.innerHTML = '';
+
+    const filtered = state.transactions.filter(t => 
+        (t.kategori && t.kategori.toLowerCase().includes(query)) || 
+        (t.catatan && t.catatan.toLowerCase().includes(query))
+    );
+
+    filtered.forEach(t => {
+        const item = document.createElement('div');
+        item.className = 'transaction-item';
+        const photoIcon = t.foto ? `
+            <a href="${t.foto}" target="_blank" class="t-photo-link">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg> Lihat Struk
+            </a>` : '';
+
+        item.innerHTML = `
+            <div class="t-info">
+                <span class="t-category">${t.kategori}</span>
+                <span class="t-date">${new Date(t.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                ${photoIcon}
+            </div>
+            <div class="t-amount ${t.jenis}">
+                ${t.jenis === 'pemasukan' ? '+' : '-'} ${formatCurrency(t.nominal)}
+            </div>
+        `;
+        list.appendChild(item);
+    });
+}
+
+// Update initialization to set up camera event listeners
+// (Adding this to the end of app.js)
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('capture-btn').addEventListener('click', startCamera);
+    document.getElementById('close-camera').addEventListener('click', stopCamera);
+    document.getElementById('shutter-btn').addEventListener('click', capturePhoto);
+    attachSubmitHandler();
 });
