@@ -1,11 +1,5 @@
 /**
- * Google Apps Script - MyFinance Backend (Simplified Revert)
- * 
- * Instructions:
- * 1. Create a new Google Sheet.
- * 2. Go to Extensions -> Apps Script.
- * 3. Paste this code and save.
- * 4. Deploy as Web App (Execute as: Me, Who has access: Anyone).
+ * Google Apps Script - MyFinance Backend (v5 - CRUD Support)
  */
 
 const SHEET_NAME = 'Transaksi';
@@ -44,21 +38,53 @@ function doPost(e) {
       sheet.appendRow(['ID', 'Tanggal', 'Jenis', 'Kategori', 'Nominal', 'Catatan', 'Timestamp']);
     }
 
-    const id = new Date().getTime();
-    const timestamp = new Date();
-    
-    sheet.appendRow([
-      id,
-      data.tanggal,
-      data.jenis,
-      data.kategori,
-      data.nominal,
-      data.catatan,
-      timestamp
-    ]);
+    const action = data.action;
 
-    return ContentService.createTextOutput(JSON.stringify({ status: 'success', id: id }))
-      .setMimeType(ContentService.MimeType.JSON);
+    if (action === 'addTransaction') {
+      const id = new Date().getTime();
+      const timestamp = new Date();
+      sheet.appendRow([id, data.tanggal, data.jenis, data.kategori, data.nominal, data.catatan, timestamp]);
+      return ContentService.createTextOutput(JSON.stringify({ status: 'success', id: id }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } 
+    
+    else if (action === 'updateTransaction') {
+      const dataRange = sheet.getDataRange();
+      const values = dataRange.getValues();
+      const idToUpdate = data.id;
+      
+      for (let i = 1; i < values.length; i++) {
+        if (values[i][0] == idToUpdate) {
+          // Update columns: Tanggal, Jenis, Kategori, Nominal, Catatan
+          sheet.getRange(i + 1, 2).setValue(data.tanggal);
+          sheet.getRange(i + 1, 3).setValue(data.jenis);
+          sheet.getRange(i + 1, 4).setValue(data.kategori);
+          sheet.getRange(i + 1, 5).setValue(data.nominal);
+          sheet.getRange(i + 1, 6).setValue(data.catatan);
+          sheet.getRange(i + 1, 7).setValue(new Date()); // Update timestamp
+          return ContentService.createTextOutput(JSON.stringify({ status: 'success' }))
+            .setMimeType(ContentService.MimeType.JSON);
+        }
+      }
+      throw new Error("Transaction ID not found");
+    } 
+    
+    else if (action === 'deleteTransaction') {
+      const dataRange = sheet.getDataRange();
+      const values = dataRange.getValues();
+      const idToDelete = data.id;
+      
+      for (let i = 1; i < values.length; i++) {
+        if (values[i][0] == idToDelete) {
+          sheet.deleteRow(i + 1);
+          return ContentService.createTextOutput(JSON.stringify({ status: 'success' }))
+            .setMimeType(ContentService.MimeType.JSON);
+        }
+      }
+      throw new Error("Transaction ID not found");
+    }
+
+    throw new Error("Unknown action");
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: err.toString() }))
       .setMimeType(ContentService.MimeType.JSON);

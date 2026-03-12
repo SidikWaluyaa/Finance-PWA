@@ -1,5 +1,5 @@
 /**
- * MyFinance App - Core Logic (v4 - Budgeting & Visuals)
+ * MyFinance App - Core Logic (v5 - CRUD Support)
  */
 
 const CONFIG = {
@@ -7,7 +7,6 @@ const CONFIG = {
     CURRENCY: 'Rp'
 };
 
-// Map categories to emojis/icons
 const CATEGORY_MAP = {
     'makanan': '🍔',
     'minuman': '☕',
@@ -25,7 +24,8 @@ let state = {
     transactions: [],
     theme: localStorage.getItem('theme') || 'light',
     activeSection: 'dashboard',
-    budgets: JSON.parse(localStorage.getItem('budgets')) || {}
+    budgets: JSON.parse(localStorage.getItem('budgets')) || {},
+    editingId: null
 };
 
 // --- Initialization ---
@@ -57,6 +57,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const saveBudgetBtn = document.getElementById('save-budget-btn');
     if (saveBudgetBtn) saveBudgetBtn.addEventListener('click', saveBudget);
+
+    const cancelEditBtn = document.getElementById('cancel-edit-btn');
+    if (cancelEditBtn) cancelEditBtn.addEventListener('click', cancelEdit);
 });
 
 function initPWA() {
@@ -87,20 +90,24 @@ function initNavigation() {
         item.addEventListener('click', () => {
             const targetSection = item.getAttribute('data-section');
             if (targetSection === state.activeSection) return;
-
-            navItems.forEach(i => i.classList.remove('active'));
-            item.classList.add('active');
-
-            sections.forEach(s => s.classList.remove('active'));
-            const targetEl = document.getElementById(`section-${targetSection}`);
-            if (targetEl) targetEl.classList.add('active');
-
-            state.activeSection = targetSection;
-            if (pageTitle) pageTitle.textContent = targetSection.charAt(0).toUpperCase() + targetSection.slice(1);
-            if (targetSection === 'statistik') renderDetailChart();
-            if (targetSection === 'dashboard') updateUI();
+            switchSection(targetSection);
         });
     });
+}
+
+function switchSection(target) {
+    const navItems = document.querySelectorAll('.nav-item[data-section]');
+    const sections = document.querySelectorAll('.page-section');
+    const pageTitle = document.getElementById('page-title');
+
+    navItems.forEach(i => i.classList.toggle('active', i.getAttribute('data-section') === target));
+    sections.forEach(s => s.classList.toggle('active', s.id === `section-${target}`));
+    
+    state.activeSection = target;
+    if (pageTitle) pageTitle.textContent = target.charAt(0).toUpperCase() + target.slice(1);
+    
+    if (target === 'statistik') renderDetailChart();
+    if (target === 'dashboard') updateUI();
 }
 
 function initForms() {
@@ -111,8 +118,10 @@ function initForms() {
     if (form) {
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
+            const action = state.editingId ? 'updateTransaction' : 'addTransaction';
             const formData = {
-                action: 'addTransaction',
+                action: action,
+                id: state.editingId,
                 tanggal: document.getElementById('t-date').value,
                 jenis: document.getElementById('t-type').value,
                 kategori: document.getElementById('t-category').value,
@@ -120,7 +129,7 @@ function initForms() {
                 catatan: document.getElementById('t-note').value
             };
 
-            showToast('Menyimpan...');
+            showToast(state.editingId ? 'Memperbarui...' : 'Menyimpan...');
             try {
                 const res = await fetch(CONFIG.API_URL, { 
                     method: 'POST', 
@@ -128,9 +137,8 @@ function initForms() {
                 });
                 const result = await res.json();
                 if (result.status === 'success') {
-                    showToast('Berhasil disimpan!');
-                    form.reset();
-                    if (dateInput) dateInput.valueAsDate = new Date();
+                    showToast(state.editingId ? 'Berhasil diperbarui!' : 'Berhasil disimpan!');
+                    cancelEdit(); // Reset form & state
                     loadData();
                 } else throw new Error(result.message);
             } catch (err) {
@@ -143,6 +151,19 @@ function initForms() {
     if (search) {
         search.addEventListener('input', (e) => renderTransactionList(e.target.value.toLowerCase()));
     }
+}
+
+function cancelEdit() {
+    state.editingId = null;
+    const form = document.getElementById('transaction-form');
+    if (form) form.reset();
+    
+    const dateInput = document.getElementById('t-date');
+    if (dateInput) dateInput.valueAsDate = new Date();
+    
+    document.getElementById('form-title').textContent = 'Tambah Transaksi';
+    document.getElementById('submit-btn').textContent = 'Simpan Transaksi';
+    document.getElementById('cancel-edit-btn').style.display = 'none';
 }
 
 // --- Data Management ---
@@ -196,9 +217,56 @@ function renderTransactionList(query = '') {
                 <span class="t-date">${new Date(t.tanggal).toLocaleDateString('id-ID')}</span>
             </div>
             <div class="t-amount ${t.jenis}">${t.jenis === 'pemasukan' ? '+' : '-'} ${formatCurrency(t.nominal)}</div>
+            <div class="t-actions">
+                <button class="btn-icon-xs btn-edit" onclick="editTransaction('${t.id}')">✏️</button>
+                <button class="btn-icon-xs btn-delete" onclick="deleteTransaction('${t.id}')">🗑️</button>
+            </div>
         `;
         list.appendChild(item);
     });
+}
+
+async function deleteTransaction(id) {
+    if (!confirm('Hapus transaksi ini?')) return;
+    
+    showToast('Menghapus...');
+    try {
+        const res = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'deleteTransaction', id: id })
+        });
+        const result = await res.json();
+        if (result.status === 'success') {
+            showToast('Terhapus!');
+            loadData();
+        } else throw new Error(result.message);
+    } catch (err) {
+        showToast('Gagal hapus: ' + err.message);
+    }
+}
+
+function editTransaction(id) {
+    const t = state.transactions.find(item => item.id == id);
+    if (!t) return;
+
+    state.editingId = id;
+    
+    // Switch to transaction section
+    switchSection('transaksi');
+    
+    // Fill form
+    document.getElementById('form-title').textContent = 'Edit Transaksi';
+    document.getElementById('submit-btn').textContent = 'Perbarui Transaksi';
+    document.getElementById('cancel-edit-btn').style.display = 'block';
+    
+    document.getElementById('t-date').value = t.tanggal.split('T')[0];
+    document.getElementById('t-type').value = t.jenis;
+    document.getElementById('t-category').value = t.kategori;
+    document.getElementById('t-amount').value = t.nominal;
+    document.getElementById('t-note').value = t.catatan || '';
+    
+    // Scroll to top of form
+    document.getElementById('section-transaksi').scrollTop = 0;
 }
 
 function renderBudgetInfo() {
@@ -216,7 +284,7 @@ function renderBudgetInfo() {
 
     categories.forEach(cat => {
         const limit = state.budgets[cat];
-        const spent = expenses.filter(t => t.kategori.toLowerCase() === cat.toLowerCase()).reduce((s, t) => s + t.nominal, 0);
+        const spent = expenses.filter(t => t.kategori.toLowerCase() === cat.toLowerCase()).reduce((s, t) => s + parseFloat(t.nominal), 0);
         const percent = Math.min(100, (spent / limit) * 100);
         const color = percent > 90 ? 'var(--expense)' : (percent > 70 ? '#F59E0B' : 'var(--income)');
 
@@ -334,3 +402,8 @@ function renderDetailChart() {
         }
     });
 }
+
+// Global functions for inline onclick handlers
+window.editTransaction = editTransaction;
+window.deleteTransaction = deleteTransaction;
+window.switchSection = switchSection;

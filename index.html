@@ -69,7 +69,7 @@
             <section id="section-transaksi" class="page-section">
                 <div class="card">
                     <form id="transaction-form">
-                        <h3>Tambah Transaksi</h3>
+                        <h3 id="form-title">Tambah Transaksi</h3>
                         <div class="form-group">
                             <label>Tanggal</label>
                             <input type="date" id="t-date" required>
@@ -103,7 +103,10 @@
                             <label>Catatan</label>
                             <textarea id="t-note" placeholder="Tambahkan catatan..."></textarea>
                         </div>
-                        <button type="submit" class="btn btn-primary">Simpan Transaksi</button>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button type="submit" id="submit-btn" class="btn btn-primary">Simpan Transaksi</button>
+                            <button type="button" id="cancel-edit-btn" class="btn btn-outline" style="display: none;">Batal Edit</button>
+                        </div>
                     </form>
                 </div>
 

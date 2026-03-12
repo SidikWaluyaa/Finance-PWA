@@ -137,6 +137,8 @@ main::-webkit-scrollbar { display: none; }
     margin-bottom: 0.75rem;
     box-shadow: 0 2px 4px rgba(0,0,0,0.02);
     border: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
 }
 
 .t-icon-box {
@@ -156,6 +158,33 @@ main::-webkit-scrollbar { display: none; }
     display: flex;
     flex-direction: column;
 }
+
+.t-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-left: 0.5rem;
+}
+
+.btn-icon-xs {
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: var(--transition);
+}
+
+.btn-icon-xs:active {
+    transform: scale(0.9);
+}
+
+.btn-edit:hover { background: #E0E7FF; color: var(--primary); border-color: var(--primary); }
+.btn-delete:hover { background: #FEE2E2; color: var(--expense); border-color: var(--expense); }
 
 .t-category {
     font-weight: 600;
