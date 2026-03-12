@@ -86,7 +86,7 @@
                     </div>
                 </div>
 
-                <!-- Charts -->
+                <!-- Charts: Dashboard -->
                 <div class="card chart-container">
                     <h3>Pengeluaran per Kategori</h3>
                     <canvas id="categoryChart"></canvas>
@@ -95,6 +95,16 @@
                 <div class="card chart-container">
                     <h3>Pemasukan vs Pengeluaran</h3>
                     <canvas id="trendChart"></canvas>
+                </div>
+
+                <div class="card chart-container">
+                    <h3>Tren Pengeluaran Harian</h3>
+                    <canvas id="dailySpendingChart"></canvas>
+                </div>
+
+                <div class="card chart-container">
+                    <h3>Saldo per Dompet</h3>
+                    <canvas id="walletPieChart"></canvas>
                 </div>
             </section>
 
@@ -161,7 +171,27 @@
             <!-- ==================== STATISTIK ==================== -->
             <section id="section-statistik" class="page-section">
                 <div class="card chart-container">
-                    <h3>Statistik Detail</h3>
+                    <h3>Tren Bulanan (6 Bulan Terakhir)</h3>
+                    <canvas id="monthlyComparisonChart"></canvas>
+                </div>
+
+                <div class="card chart-container">
+                    <h3>Arus Kas (Cash Flow)</h3>
+                    <canvas id="cashFlowChart"></canvas>
+                </div>
+
+                <div class="card chart-container">
+                    <h3>Top 5 Kategori Pengeluaran</h3>
+                    <canvas id="topCategoriesChart"></canvas>
+                </div>
+
+                <div class="card chart-container">
+                    <h3>Distribusi per Dompet</h3>
+                    <canvas id="walletDistributionChart"></canvas>
+                </div>
+
+                <div class="card chart-container">
+                    <h3>Detail Pemasukan vs Pengeluaran</h3>
                     <canvas id="detailChart"></canvas>
                 </div>
             </section>

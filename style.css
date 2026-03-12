@@ -355,6 +355,11 @@ main::-webkit-scrollbar { display: none; }
 .income-card .amount { color: var(--income); }
 .expense-card .amount { color: var(--expense); }
 
+/* Summary Cards Wrapper */
+.summary-cards {
+    margin-bottom: 1rem;
+}
+
 /* ============================
    DATE FILTER
    ============================ */

@@ -719,62 +719,248 @@ function showToast(m) {
     }
 }
 
-// --- Charts ---
-let catChart, trendChart, detailChart;
+// --- Charts & Analytics ---
+const CHART_COLORS = ['#6366F1', '#06B6D4', '#10B981', '#F59E0B', '#F43F5E', '#8B5CF6', '#EC4899', '#14B8A6'];
+
+let catChart, trendChart, dailySpendingChart, walletPieChart;
+let monthlyCompChart, cashFlowChart, topCatChart, walletDistChart, detailChart;
+
+const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: {
+        legend: { 
+            position: 'bottom', 
+            labels: { 
+                padding: 16, 
+                usePointStyle: true, 
+                pointStyle: 'circle',
+                font: { family: 'Inter', size: 11, weight: '600' }
+            }
+        }
+    }
+};
+
 function initCharts() {
     const catCtx = document.getElementById('categoryChart');
     const trendCtx = document.getElementById('trendChart');
-    if (!catCtx || !trendCtx) return;
+    const dailyCtx = document.getElementById('dailySpendingChart');
+    const walletCtx = document.getElementById('walletPieChart');
 
-    catChart = new Chart(catCtx, {
-        type: 'doughnut',
-        data: { labels: [], datasets: [{ data: [], backgroundColor: ['#4F46E5', '#06B6D4', '#10B981', '#F59E0B', '#EF4444'] }] },
-        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
-    });
+    if (catCtx) {
+        catChart = new Chart(catCtx, {
+            type: 'doughnut',
+            data: { labels: [], datasets: [{ data: [], backgroundColor: CHART_COLORS, borderWidth: 0 }] },
+            options: { ...chartDefaults, cutout: '68%', plugins: { ...chartDefaults.plugins, legend: { ...chartDefaults.plugins.legend } } }
+        });
+    }
 
-    trendChart = new Chart(trendCtx, {
-        type: 'bar',
-        data: { labels: ['Pemasukan', 'Pengeluaran'], datasets: [{ data: [0, 0], backgroundColor: ['#10B981', '#EF4444'] }] },
-        options: { responsive: true, plugins: { legend: { display: false } } }
-    });
+    if (trendCtx) {
+        trendChart = new Chart(trendCtx, {
+            type: 'bar',
+            data: { 
+                labels: ['Pemasukan', 'Pengeluaran'], 
+                datasets: [{ data: [0, 0], backgroundColor: ['#10B981', '#F43F5E'], borderRadius: 8, borderSkipped: false, barThickness: 40 }] 
+            },
+            options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { font: { family: 'Inter', size: 10 } } }, x: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11, weight: '600' } } } } }
+        });
+    }
+
+    if (dailyCtx) {
+        dailySpendingChart = new Chart(dailyCtx, {
+            type: 'line',
+            data: { labels: [], datasets: [{ label: 'Pengeluaran', data: [], borderColor: '#F43F5E', backgroundColor: 'rgba(244, 63, 94, 0.08)', fill: true, tension: 0.4, pointRadius: 3, pointBackgroundColor: '#F43F5E', borderWidth: 2 }] },
+            options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { font: { size: 10 } } }, x: { grid: { display: false }, ticks: { font: { size: 9 }, maxRotation: 0 } } } }
+        });
+    }
+
+    if (walletCtx) {
+        walletPieChart = new Chart(walletCtx, {
+            type: 'doughnut',
+            data: { labels: [], datasets: [{ data: [], backgroundColor: CHART_COLORS, borderWidth: 0 }] },
+            options: { ...chartDefaults, cutout: '55%' }
+        });
+    }
 }
 
 function updateCharts() {
-    if (!catChart || !trendChart) return;
-    const expItems = state.transactions.filter(t => t.jenis === 'pengeluaran');
-    const cats = {};
-    expItems.forEach(i => { cats[i.kategori] = (cats[i.kategori] || 0) + (parseFloat(i.nominal) || 0); });
-    catChart.data.labels = Object.keys(cats);
-    catChart.data.datasets[0].data = Object.values(cats);
-    catChart.update();
+    const txs = getFilteredTransactions();
 
-    const inc = state.transactions.filter(t => t.jenis === 'pemasukan').reduce((s,t) => s+(parseFloat(t.nominal)||0), 0);
-    const exp = state.transactions.filter(t => t.jenis === 'pengeluaran').reduce((s,t) => s+(parseFloat(t.nominal)||0), 0);
-    trendChart.data.datasets[0].data = [inc, exp];
-    trendChart.update();
+    // 1. Category Doughnut (Dashboard)
+    if (catChart) {
+        const cats = {};
+        txs.filter(t => t.jenis === 'pengeluaran').forEach(i => { cats[i.kategori || 'Lainnya'] = (cats[i.kategori || 'Lainnya'] || 0) + (parseFloat(i.nominal) || 0); });
+        catChart.data.labels = Object.keys(cats);
+        catChart.data.datasets[0].data = Object.values(cats);
+        catChart.update();
+    }
+
+    // 2. Income vs Expense Bar (Dashboard)
+    if (trendChart) {
+        const inc = txs.filter(t => t.jenis === 'pemasukan').reduce((s, t) => s + (parseFloat(t.nominal) || 0), 0);
+        const exp = txs.filter(t => t.jenis === 'pengeluaran').reduce((s, t) => s + (parseFloat(t.nominal) || 0), 0);
+        trendChart.data.datasets[0].data = [inc, exp];
+        trendChart.update();
+    }
+
+    // 3. Daily Spending Trend (Dashboard)
+    if (dailySpendingChart) {
+        const dailyData = {};
+        txs.filter(t => t.jenis === 'pengeluaran').forEach(t => {
+            const d = new Date(t.tanggal);
+            const day = d.getDate();
+            dailyData[day] = (dailyData[day] || 0) + (parseFloat(t.nominal) || 0);
+        });
+        const sortedDays = Object.keys(dailyData).sort((a, b) => a - b);
+        dailySpendingChart.data.labels = sortedDays.map(d => `${d}`);
+        dailySpendingChart.data.datasets[0].data = sortedDays.map(d => dailyData[d]);
+        dailySpendingChart.update();
+    }
+
+    // 4. Wallet Balance Pie (Dashboard)
+    if (walletPieChart) {
+        const walletBals = {};
+        state.wallets.forEach(w => walletBals[w] = 0);
+        state.transactions.forEach(t => {
+            const nominal = parseFloat(t.nominal) || 0;
+            const dompet = t.dompet || 'Tunai';
+            if (!walletBals[dompet]) walletBals[dompet] = 0;
+            if (t.jenis === 'pemasukan') walletBals[dompet] += nominal;
+            else if (t.jenis === 'pengeluaran') walletBals[dompet] -= nominal;
+        });
+        const positiveWallets = {};
+        Object.entries(walletBals).forEach(([k, v]) => { if (v > 0) positiveWallets[k] = v; });
+        walletPieChart.data.labels = Object.keys(positiveWallets);
+        walletPieChart.data.datasets[0].data = Object.values(positiveWallets);
+        walletPieChart.update();
+    }
 }
 
 function renderDetailChart() {
-    const ctx = document.getElementById('detailChart');
-    if (!ctx) return;
-    if (detailChart) detailChart.destroy();
-    const months = {};
-    state.transactions.forEach(t => {
-        const m = new Date(t.tanggal).toLocaleString('id-ID', { month: 'short' });
-        if (!months[m]) months[m] = { in: 0, out: 0 };
-        if (t.jenis === 'pemasukan') months[m].in += (parseFloat(t.nominal) || 0);
-        else months[m].out += (parseFloat(t.nominal) || 0);
-    });
-    detailChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: Object.keys(months),
-            datasets: [
-                { label: 'In', data: Object.values(months).map(v => v.in), borderColor: '#10B981' },
-                { label: 'Out', data: Object.values(months).map(v => v.out), borderColor: '#EF4444' }
-            ]
-        }
-    });
+    // Build list of last 6 months
+    const now = new Date();
+    const monthLabels = [];
+    const incData = [];
+    const expData = [];
+    const netData = [];
+
+    for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const key = `${yyyy}-${mm}`;
+        monthLabels.push(d.toLocaleString('id-ID', { month: 'short', year: '2-digit' }));
+
+        const monthTxs = state.transactions.filter(t => {
+            if (!t.tanggal) return false;
+            try { const td = new Date(t.tanggal); return td.getFullYear() === yyyy && td.getMonth() === d.getMonth(); } catch (e) { return false; }
+        });
+
+        const mInc = monthTxs.filter(t => t.jenis === 'pemasukan').reduce((s, t) => s + (parseFloat(t.nominal) || 0), 0);
+        const mExp = monthTxs.filter(t => t.jenis === 'pengeluaran').reduce((s, t) => s + (parseFloat(t.nominal) || 0), 0);
+        incData.push(mInc);
+        expData.push(mExp);
+        netData.push(mInc - mExp);
+    }
+
+    // Monthly Comparison (Grouped Bar)
+    const monthlyCtx = document.getElementById('monthlyComparisonChart');
+    if (monthlyCtx) {
+        if (monthlyCompChart) monthlyCompChart.destroy();
+        monthlyCompChart = new Chart(monthlyCtx, {
+            type: 'bar',
+            data: {
+                labels: monthLabels,
+                datasets: [
+                    { label: 'Pemasukan', data: incData, backgroundColor: '#10B981', borderRadius: 6, borderSkipped: false },
+                    { label: 'Pengeluaran', data: expData, backgroundColor: '#F43F5E', borderRadius: 6, borderSkipped: false }
+                ]
+            },
+            options: { ...chartDefaults, scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { font: { size: 10 } } }, x: { grid: { display: false }, ticks: { font: { size: 10, weight: '600' } } } } }
+        });
+    }
+
+    // Cash Flow (Area Line)
+    const cashFlowCtx = document.getElementById('cashFlowChart');
+    if (cashFlowCtx) {
+        if (cashFlowChart) cashFlowChart.destroy();
+        cashFlowChart = new Chart(cashFlowCtx, {
+            type: 'line',
+            data: {
+                labels: monthLabels,
+                datasets: [{
+                    label: 'Net Cash Flow',
+                    data: netData,
+                    borderColor: '#6366F1',
+                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 5,
+                    pointBackgroundColor: '#6366F1',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    borderWidth: 2.5
+                }]
+            },
+            options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, legend: { display: false } }, scales: { y: { grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { font: { size: 10 } } }, x: { grid: { display: false }, ticks: { font: { size: 10, weight: '600' } } } } }
+        });
+    }
+
+    // Top 5 Categories (Horizontal Bar)
+    const topCatCtx = document.getElementById('topCategoriesChart');
+    if (topCatCtx) {
+        if (topCatChart) topCatChart.destroy();
+        const allExpenses = state.transactions.filter(t => t.jenis === 'pengeluaran');
+        const catTotals = {};
+        allExpenses.forEach(t => { catTotals[t.kategori || 'Lainnya'] = (catTotals[t.kategori || 'Lainnya'] || 0) + (parseFloat(t.nominal) || 0); });
+        const sorted = Object.entries(catTotals).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+        topCatChart = new Chart(topCatCtx, {
+            type: 'bar',
+            data: {
+                labels: sorted.map(s => s[0]),
+                datasets: [{ data: sorted.map(s => s[1]), backgroundColor: CHART_COLORS.slice(0, 5), borderRadius: 6, borderSkipped: false }]
+            },
+            options: { ...chartDefaults, indexAxis: 'y', plugins: { ...chartDefaults.plugins, legend: { display: false } }, scales: { x: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { font: { size: 10 } } }, y: { grid: { display: false }, ticks: { font: { size: 11, weight: '600' } } } } }
+        });
+    }
+
+    // Wallet Distribution (Doughnut)
+    const walletDistCtx = document.getElementById('walletDistributionChart');
+    if (walletDistCtx) {
+        if (walletDistChart) walletDistChart.destroy();
+        const walletSpending = {};
+        state.transactions.filter(t => t.jenis === 'pengeluaran').forEach(t => {
+            const d = t.dompet || 'Tunai';
+            walletSpending[d] = (walletSpending[d] || 0) + (parseFloat(t.nominal) || 0);
+        });
+
+        walletDistChart = new Chart(walletDistCtx, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(walletSpending),
+                datasets: [{ data: Object.values(walletSpending), backgroundColor: CHART_COLORS, borderWidth: 0 }]
+            },
+            options: { ...chartDefaults, cutout: '60%' }
+        });
+    }
+
+    // Detail Line (Monthly In vs Out)
+    const detailCtx = document.getElementById('detailChart');
+    if (detailCtx) {
+        if (detailChart) detailChart.destroy();
+        detailChart = new Chart(detailCtx, {
+            type: 'line',
+            data: {
+                labels: monthLabels,
+                datasets: [
+                    { label: 'Pemasukan', data: incData, borderColor: '#10B981', backgroundColor: 'rgba(16,185,129,0.08)', fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#10B981', borderWidth: 2 },
+                    { label: 'Pengeluaran', data: expData, borderColor: '#F43F5E', backgroundColor: 'rgba(244,63,94,0.08)', fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#F43F5E', borderWidth: 2 }
+                ]
+            },
+            options: { ...chartDefaults, scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { font: { size: 10 } } }, x: { grid: { display: false }, ticks: { font: { size: 10, weight: '600' } } } } }
+        });
+    }
 }
 
 // Global functions for inline onclick handlers
