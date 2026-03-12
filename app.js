@@ -1,5 +1,5 @@
 /**
- * MyFinance App - Core Logic (Clean Revert)
+ * MyFinance App - Core Logic (v4 - Budgeting & Visuals)
  */
 
 const CONFIG = {
@@ -7,10 +7,25 @@ const CONFIG = {
     CURRENCY: 'Rp'
 };
 
+// Map categories to emojis/icons
+const CATEGORY_MAP = {
+    'makanan': '🍔',
+    'minuman': '☕',
+    'gaji': '💰',
+    'transport': '🚗',
+    'belanja': '🛍️',
+    'hiburan': '🎬',
+    'kesehatan': '🏥',
+    'tagihan': '📑',
+    'pendidikan': '🎓',
+    'lainnya': '📦'
+};
+
 let state = {
     transactions: [],
     theme: localStorage.getItem('theme') || 'light',
-    activeSection: 'dashboard'
+    activeSection: 'dashboard',
+    budgets: JSON.parse(localStorage.getItem('budgets')) || {}
 };
 
 // --- Initialization ---
@@ -22,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initCharts();
     loadData();
     
-    // Refresh App Button
+    // Custom Actions
     const refreshBtn = document.getElementById('force-refresh-btn');
     if (refreshBtn) {
         refreshBtn.addEventListener('click', () => {
@@ -36,6 +51,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    const exportBtn = document.getElementById('export-csv-btn');
+    if (exportBtn) exportBtn.addEventListener('click', exportToCSV);
+
+    const saveBudgetBtn = document.getElementById('save-budget-btn');
+    if (saveBudgetBtn) saveBudgetBtn.addEventListener('click', saveBudget);
 });
 
 function initPWA() {
@@ -77,6 +98,7 @@ function initNavigation() {
             state.activeSection = targetSection;
             if (pageTitle) pageTitle.textContent = targetSection.charAt(0).toUpperCase() + targetSection.slice(1);
             if (targetSection === 'statistik') renderDetailChart();
+            if (targetSection === 'dashboard') updateUI();
         });
     });
 }
@@ -138,6 +160,7 @@ async function loadData() {
 function updateUI() {
     calculateSummary();
     renderTransactionList();
+    renderBudgetInfo();
     updateCharts();
 }
 
@@ -163,7 +186,11 @@ function renderTransactionList(query = '') {
     filtered.forEach(t => {
         const item = document.createElement('div');
         item.className = 'transaction-item';
+        const categoryKey = (t.kategori || '').toLowerCase();
+        const icon = CATEGORY_MAP[categoryKey] || '📦';
+        
         item.innerHTML = `
+            <div class="t-icon-box">${icon}</div>
             <div class="t-info">
                 <span class="t-category">${t.kategori || 'Lainnya'}</span>
                 <span class="t-date">${new Date(t.tanggal).toLocaleDateString('id-ID')}</span>
@@ -172,6 +199,69 @@ function renderTransactionList(query = '') {
         `;
         list.appendChild(item);
     });
+}
+
+function renderBudgetInfo() {
+    const container = document.getElementById('budget-summary');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const expenses = state.transactions.filter(t => t.jenis === 'pengeluaran');
+    const categories = Object.keys(state.budgets);
+
+    if (categories.length === 0) {
+        container.innerHTML = '<p class="text-light" style="font-size: 0.8rem;">Belum ada budget yang diatur.</p>';
+        return;
+    }
+
+    categories.forEach(cat => {
+        const limit = state.budgets[cat];
+        const spent = expenses.filter(t => t.kategori.toLowerCase() === cat.toLowerCase()).reduce((s, t) => s + t.nominal, 0);
+        const percent = Math.min(100, (spent / limit) * 100);
+        const color = percent > 90 ? 'var(--expense)' : (percent > 70 ? '#F59E0B' : 'var(--income)');
+
+        const el = document.createElement('div');
+        el.className = 'budget-item';
+        el.innerHTML = `
+            <div class="budget-label">
+                <span>${cat.charAt(0).toUpperCase() + cat.slice(1)}</span>
+                <span>${formatCurrency(spent)} / ${formatCurrency(limit)}</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: ${percent}%; background: ${color}"></div>
+            </div>
+        `;
+        container.appendChild(el);
+    });
+}
+
+function saveBudget() {
+    const cat = document.getElementById('budget-category').value.toLowerCase().trim();
+    const limit = parseFloat(document.getElementById('budget-limit').value);
+    
+    if (cat && limit) {
+        state.budgets[cat] = limit;
+        localStorage.setItem('budgets', JSON.stringify(state.budgets));
+        showToast(`Budget ${cat} disimpan!`);
+        updateUI();
+    }
+}
+
+function exportToCSV() {
+    if (state.transactions.length === 0) return;
+    
+    let csv = 'ID,Tanggal,Jenis,Kategori,Nominal,Catatan\n';
+    state.transactions.forEach(t => {
+        csv += `${t.id},${t.tanggal},${t.jenis},${t.kategori},${t.nominal},"${t.catatan}"\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Keuangan_${new Date().toLocaleDateString()}.csv`;
+    a.click();
+    showToast('Laporan diunduh!');
 }
 
 function formatCurrency(n) {
