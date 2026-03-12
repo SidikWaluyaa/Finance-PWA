@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>MyFinance</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4F46E5">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="app-header">
+            <h1 id="page-title">Dashboard</h1>
+            <button id="notification-btn" class="icon-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+            </button>
+        </header>
+
+        <!-- Main Content Area -->
+        <main id="main-content">
+            <!-- Dashboard Section -->
+            <section id="section-dashboard" class="page-section active">
+                <div class="summary-cards">
+                    <div class="card primary-card">
+                        <span class="label">Total Saldo</span>
+                        <h2 id="total-balance">Rp 0</h2>
+                    </div>
+                    <div class="stats-row">
+                        <div class="card income-card">
+                            <span class="label">Pemasukan</span>
+                            <span class="amount" id="total-income">Rp 0</span>
+                        </div>
+                        <div class="card expense-card">
+                            <span class="label">Pengeluaran</span>
+                            <span class="amount" id="total-expense">Rp 0</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="chart-container card">
+                    <h3>Pengeluaran per Kategori</h3>
+                    <canvas id="categoryChart"></canvas>
+                </div>
+                
+                <div class="chart-container card">
+                    <h3>Pemasukan vs Pengeluaran</h3>
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </section>
+
+            <!-- Transaksi Section -->
+            <section id="section-transaksi" class="page-section">
+                <div class="card">
+                    <form id="transaction-form">
+                        <h3>Tambah Transaksi</h3>
+                        <div class="form-group">
+                            <label>Tanggal</label>
+                            <input type="date" id="t-date" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Jenis</label>
+                            <select id="t-type" required>
+                                <option value="pemasukan">Pemasukan</option>
+                                <option value="pengeluaran">Pengeluaran</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Kategori</label>
+                            <input type="text" id="t-category" placeholder="e.g. Makanan, Gaji" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Nominal</label>
+                            <input type="number" id="t-amount" placeholder="0" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Catatan</label>
+                            <textarea id="t-note" placeholder="Tambahkan catatan..."></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Simpan Transaksi</button>
+                    </form>
+                </div>
+
+                <div class="history-header">
+                    <h3>Riwayat Transaksi</h3>
+                    <div class="filters">
+                        <input type="text" id="search-input" placeholder="Cari...">
+                    </div>
+                </div>
+                <div id="transaction-list" class="list-container">
+                    <!-- Transactions will be injected here -->
+                    <div class="skeleton-list"></div>
+                </div>
+            </section>
+
+            <!-- Statistik Section -->
+            <section id="section-statistik" class="page-section">
+                <div class="card">
+                    <h3>Statistik Detail</h3>
+                    <canvas id="detailChart"></canvas>
+                </div>
+            </section>
+
+            <!-- Scan Section -->
+            <section id="section-scan" class="page-section">
+                <div class="card text-center">
+                    <div id="camera-preview-container">
+                        <div class="camera-placeholder">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button id="capture-btn" class="btn btn-secondary">Ambil Foto</button>
+                        <input type="file" id="upload-receipt" hidden accept="image/*">
+                        <button id="upload-btn" class="btn btn-outline" onclick="document.getElementById('upload-receipt').click()">Upload Gambar</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Profil Section -->
+            <section id="section-profil" class="page-section">
+                <div class="profile-header card">
+                    <div class="avatar">U</div>
+                    <div class="user-info">
+                        <h2 id="user-name">Pengguna Keuangan</h2>
+                        <span id="user-email">user@example.com</span>
+                    </div>
+                </div>
+                <div class="card settings-list">
+                    <div class="setting-item">
+                        <span>Dark Mode</span>
+                        <label class="switch">
+                            <input type="checkbox" id="dark-mode-toggle">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <span>Currency</span>
+                        <span>IDR (Rp)</span>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav">
+            <button class="nav-item active" data-section="dashboard">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                <span>Beranda</span>
+            </button>
+            <button class="nav-item" data-section="transaksi">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                <span>Transaksi</span>
+            </button>
+            <button class="nav-item" data-section="statistik">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                <span>Statistik</span>
+            </button>
+            <button class="nav-item" data-section="scan">
+                <div class="nav-scan-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                </div>
+            </button>
+            <button class="nav-item" data-section="profil">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                <span>Profil</span>
+            </button>
+        </nav>
+
+        <!-- Toast Notification -->
+        <div id="toast" class="toast hidden"></div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
