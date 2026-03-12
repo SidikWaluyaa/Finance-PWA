@@ -44,6 +44,8 @@ document.addEventListener('DOMContentLoaded', () => {
     window.editTransaction = editTransaction;
     window.deleteTransaction = deleteTransaction;
     window.deleteGoal = deleteGoal;
+    window.saveGoal = saveGoal;
+    window.saveBudget = saveBudget;
     
     // Custom Actions
     const refreshBtn = document.getElementById('force-refresh-btn');
