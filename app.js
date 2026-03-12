@@ -226,7 +226,17 @@ async function loadData() {
 
 function getFilteredTransactions() {
     if (!state.dateFilter) return state.transactions;
-    return state.transactions.filter(t => t.tanggal && t.tanggal.startsWith(state.dateFilter));
+    return state.transactions.filter(t => {
+        if (!t.tanggal) return false;
+        try {
+            const dateObj = new Date(t.tanggal);
+            const yyyy = dateObj.getFullYear();
+            const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+            return `${yyyy}-${mm}` === state.dateFilter;
+        } catch(e) {
+            return false;
+        }
+    });
 }
 
 function updateUI() {
@@ -238,13 +248,18 @@ function updateUI() {
 }
 
 function calculateSummary() {
-    const txs = getFilteredTransactions();
-    const inc = txs.filter(t => t.jenis === 'pemasukan').reduce((s, t) => s + (parseFloat(t.nominal) || 0), 0);
-    const exp = txs.filter(t => t.jenis === 'pengeluaran').reduce((s, t) => s + (parseFloat(t.nominal) || 0), 0);
+    // Total Saldo (All-Time)
+    const allInc = state.transactions.filter(t => t.jenis === 'pemasukan').reduce((s, t) => s + (parseFloat(t.nominal) || 0), 0);
+    const allExp = state.transactions.filter(t => t.jenis === 'pengeluaran').reduce((s, t) => s + (parseFloat(t.nominal) || 0), 0);
     
-    document.getElementById('total-balance').textContent = formatCurrency(inc - exp);
-    document.getElementById('total-income').textContent = formatCurrency(inc);
-    document.getElementById('total-expense').textContent = formatCurrency(exp);
+    // Income and Expense (Filtered by Month)
+    const txs = getFilteredTransactions();
+    const sumInc = txs.filter(t => t.jenis === 'pemasukan').reduce((s, t) => s + (parseFloat(t.nominal) || 0), 0);
+    const sumExp = txs.filter(t => t.jenis === 'pengeluaran').reduce((s, t) => s + (parseFloat(t.nominal) || 0), 0);
+    
+    document.getElementById('total-balance').textContent = formatCurrency(allInc - allExp);
+    document.getElementById('total-income').textContent = formatCurrency(sumInc);
+    document.getElementById('total-expense').textContent = formatCurrency(sumExp);
 }
 
 function renderTransactionList(query = '') {
