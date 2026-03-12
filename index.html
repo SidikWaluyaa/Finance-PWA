@@ -28,6 +28,10 @@
         <main id="main-content">
             <!-- Dashboard Section -->
             <section id="section-dashboard" class="page-section active">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h2 style="font-size: 1.2rem;">Ringkasan Bulan</h2>
+                    <input type="month" id="global-date-filter" style="padding: 0.4rem; border-radius: 8px; border: 1px solid var(--border); font-family: inherit;">
+                </div>
                 <div class="summary-cards">
                     <div class="card primary-card">
                         <span class="label">Total Saldo</span>
@@ -55,8 +59,20 @@
                         <!-- Budget bars will be injected here -->
                     </div>
                 </div>
+
+                <!-- Savings Goals Summary -->
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="font-size: 1rem;">Target Tabungan (Goals)</h3>
+                        <span style="font-size: 0.75rem; color: var(--primary); cursor: pointer;" onclick="switchSection('profil')">Atur Target</span>
+                    </div>
+                    <div id="savings-summary">
+                        <!-- Savings Goal bars will be injected here -->
+                    </div>
+                </div>
                 
                 <div class="chart-container card">
+
                     <h3>Pengeluaran per Kategori</h3>
                     <canvas id="categoryChart"></canvas>
                 </div>
@@ -159,6 +175,15 @@
                     </div>
                 </div>
 
+                <div class="card">
+                    <h3>Atur Target Tabungan (Goals)</h3>
+                    <div class="form-group" style="margin-top: 1rem;">
+                        <input type="text" id="goal-name" placeholder="Nama Target (misal: Beli Laptop)" style="margin-bottom: 0.5rem;" required>
+                        <input type="number" id="goal-target" placeholder="Target Nominal (misal: 10000000)" required>
+                        <button id="save-goal-btn" class="btn btn-secondary" style="margin-top: 0.5rem;">Simpan Target</button>
+                    </div>
+                </div>
+                
                 <div class="card settings-list">
                     <div class="setting-item" style="flex-direction: column; align-items: flex-start; gap: 0.5rem;">
                         <div style="display: flex; justify-content: space-between; width: 100%;">

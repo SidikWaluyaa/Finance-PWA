@@ -26,7 +26,9 @@ let state = {
     zoom: localStorage.getItem('zoom') || 16,
     activeSection: 'dashboard',
     budgets: JSON.parse(localStorage.getItem('budgets')) || {},
-    editingId: null
+    editingId: null,
+    savingsGoals: JSON.parse(localStorage.getItem('savingsGoals')) || [],
+    dateFilter: new Date().toISOString().slice(0, 7)
 };
 
 // --- Initialization ---
@@ -38,10 +40,10 @@ document.addEventListener('DOMContentLoaded', () => {
     initCharts();
     loadData();
     
-    // Global functions for inline onclick handlers
     window.deleteBudget = deleteBudget;
     window.editTransaction = editTransaction;
     window.deleteTransaction = deleteTransaction;
+    window.deleteGoal = deleteGoal;
     
     // Custom Actions
     const refreshBtn = document.getElementById('force-refresh-btn');
@@ -174,6 +176,21 @@ function initForms() {
         });
     }
 
+    const saveBudgetBtn = document.getElementById('save-budget-btn');
+    if (saveBudgetBtn) saveBudgetBtn.addEventListener('click', saveBudget);
+
+    const saveGoalBtn = document.getElementById('save-goal-btn');
+    if (saveGoalBtn) saveGoalBtn.addEventListener('click', saveGoal);
+
+    const dateFilter = document.getElementById('global-date-filter');
+    if (dateFilter) {
+        dateFilter.value = state.dateFilter;
+        dateFilter.addEventListener('change', (e) => {
+            state.dateFilter = e.target.value;
+            updateUI();
+        });
+    }
+
     const search = document.getElementById('search-input');
     if (search) {
         search.addEventListener('input', (e) => renderTransactionList(e.target.value.toLowerCase()));
@@ -205,16 +222,23 @@ async function loadData() {
     }
 }
 
+function getFilteredTransactions() {
+    if (!state.dateFilter) return state.transactions;
+    return state.transactions.filter(t => t.tanggal && t.tanggal.startsWith(state.dateFilter));
+}
+
 function updateUI() {
     calculateSummary();
     renderTransactionList();
     renderBudgetInfo();
+    renderSavingsGoals();
     updateCharts();
 }
 
 function calculateSummary() {
-    const inc = state.transactions.filter(t => t.jenis === 'pemasukan').reduce((s, t) => s + (parseFloat(t.nominal) || 0), 0);
-    const exp = state.transactions.filter(t => t.jenis === 'pengeluaran').reduce((s, t) => s + (parseFloat(t.nominal) || 0), 0);
+    const txs = getFilteredTransactions();
+    const inc = txs.filter(t => t.jenis === 'pemasukan').reduce((s, t) => s + (parseFloat(t.nominal) || 0), 0);
+    const exp = txs.filter(t => t.jenis === 'pengeluaran').reduce((s, t) => s + (parseFloat(t.nominal) || 0), 0);
     
     document.getElementById('total-balance').textContent = formatCurrency(inc - exp);
     document.getElementById('total-income').textContent = formatCurrency(inc);
@@ -226,7 +250,8 @@ function renderTransactionList(query = '') {
     if (!list) return;
     list.innerHTML = '';
     
-    const filtered = state.transactions.filter(t => 
+    const txs = getFilteredTransactions();
+    const filtered = txs.filter(t => 
         (t.kategori && t.kategori.toLowerCase().includes(query)) || 
         (t.catatan && t.catatan.toLowerCase().includes(query))
     );
@@ -301,7 +326,8 @@ function renderBudgetInfo() {
     if (!container) return;
     container.innerHTML = '';
 
-    const expenses = state.transactions.filter(t => t.jenis === 'pengeluaran');
+    const txs = getFilteredTransactions();
+    const expenses = txs.filter(t => t.jenis === 'pengeluaran');
     const categories = Object.keys(state.budgets);
 
     if (categories.length === 0) {
@@ -362,6 +388,79 @@ function deleteBudget(category) {
         delete state.budgets[category];
         localStorage.setItem('budgets', JSON.stringify(state.budgets));
         showToast(`Budget ${category} dihapus!`);
+        updateUI();
+    }
+}
+
+function renderSavingsGoals() {
+    const container = document.getElementById('savings-summary');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!state.savingsGoals || state.savingsGoals.length === 0) {
+        container.innerHTML = '<p class="text-light" style="font-size: 0.8rem;">Belum ada target tabungan yang diatur.</p>';
+        return;
+    }
+
+    // Savings are money moved out of available balance to a "Savings" bucket. 
+    // We calculate total saved by summing all 'pengeluaran' across all time tagged as 'Tabungan'.
+    const totalSaved = state.transactions
+        .filter(t => t.jenis === 'pengeluaran' && t.kategori && t.kategori.toLowerCase() === 'tabungan')
+        .reduce((s, t) => s + parseFloat(t.nominal), 0);
+
+    state.savingsGoals.forEach((goal, index) => {
+        const percent = Math.min(100, (totalSaved / goal.amount) * 100);
+        const color = percent >= 100 ? 'var(--income)' : '#3B82F6';
+
+        const el = document.createElement('div');
+        el.className = 'budget-item';
+        el.innerHTML = `
+            <div class="budget-label" style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-weight: 700;">${goal.name}</span>
+                <div class="budget-actions" style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 0.85rem;">${formatCurrency(totalSaved)} / ${formatCurrency(goal.amount)}</span>
+                </div>
+            </div>
+            <div class="progress-bar" style="margin-top: 5px;">
+                <div class="progress-fill" style="width: ${percent}%; background: ${color}"></div>
+            </div>
+        `;
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.innerHTML = '🗑️';
+        deleteBtn.className = 'btn-icon-xs btn-delete';
+        deleteBtn.style.padding = '0';
+        deleteBtn.style.width = '28px';
+        deleteBtn.style.height = '28px';
+        deleteBtn.title = 'Hapus Target';
+        deleteBtn.onclick = () => deleteGoal(index);
+        
+        el.querySelector('.budget-actions').appendChild(deleteBtn);
+        
+        container.appendChild(el);
+    });
+}
+
+function saveGoal() {
+    const name = document.getElementById('goal-name').value.trim();
+    const amount = parseFloat(document.getElementById('goal-target').value);
+    
+    if (name && amount) {
+        if (!state.savingsGoals) state.savingsGoals = [];
+        state.savingsGoals.push({ name, amount });
+        localStorage.setItem('savingsGoals', JSON.stringify(state.savingsGoals));
+        showToast(`Target ${name} disimpan!`);
+        document.getElementById('goal-name').value = '';
+        document.getElementById('goal-target').value = '';
+        updateUI();
+    }
+}
+
+function deleteGoal(index) {
+    if (confirm(`Hapus target tabungan ini?`)) {
+        state.savingsGoals.splice(index, 1);
+        localStorage.setItem('savingsGoals', JSON.stringify(state.savingsGoals));
+        showToast(`Target dihapus!`);
         updateUI();
     }
 }
