@@ -1,5 +1,5 @@
 /**
- * MyFinance App - Core Logic (v2 - Fixed Scan & Feedback)
+ * MyFinance App - Core Logic (v3 - Optimized Camera & Drive)
  */
 
 const CONFIG = {
@@ -21,16 +21,16 @@ document.addEventListener('DOMContentLoaded', () => {
     initNavigation();
     initForms();
     initCharts();
-    initCameraControls();
+    initCameraHandlers();
     loadData();
     
-    // Force Refresh button
+    // Refresh App Button
     const refreshBtn = document.getElementById('force-refresh-btn');
     if (refreshBtn) {
         refreshBtn.addEventListener('click', () => {
             if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.getRegistrations().then(registrations => {
-                    for(let registration of registrations) { registration.unregister(); }
+                navigator.serviceWorker.getRegistrations().then(regs => {
+                    regs.forEach(r => r.unregister());
                     window.location.reload(true);
                 });
             } else {
@@ -42,17 +42,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function initPWA() {
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./service-worker.js').catch(err => console.error('SW Error', err));
+        navigator.serviceWorker.register('./service-worker.js').catch(e => console.error(e));
     }
 }
 
 function initTheme() {
     const toggle = document.getElementById('dark-mode-toggle');
-    if (state.theme === 'dark') {
-        document.documentElement.setAttribute('data-theme', 'dark');
-        if (toggle) toggle.checked = true;
-    }
+    if (state.theme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
     if (toggle) {
+        toggle.checked = state.theme === 'dark';
         toggle.addEventListener('change', (e) => {
             state.theme = e.target.checked ? 'dark' : 'light';
             document.documentElement.setAttribute('data-theme', state.theme);
@@ -68,21 +66,23 @@ function initNavigation() {
 
     navItems.forEach(item => {
         item.addEventListener('click', () => {
-            const targetSection = item.getAttribute('data-section');
-            if (targetSection === state.activeSection) return;
-
-            navItems.forEach(i => i.classList.remove('active'));
-            item.classList.add('active');
-
-            sections.forEach(s => s.classList.remove('active'));
-            const targetEl = document.getElementById(`section-${targetSection}`);
-            if (targetEl) targetEl.classList.add('active');
-
-            state.activeSection = targetSection;
-            pageTitle.textContent = targetSection.charAt(0).toUpperCase() + targetSection.slice(1);
-            if (targetSection === 'statistik') renderDetailChart();
+            const target = item.getAttribute('data-section');
+            switchSection(target);
         });
     });
+}
+
+function switchSection(target) {
+    const navItems = document.querySelectorAll('.nav-item[data-section]');
+    const sections = document.querySelectorAll('.page-section');
+    const pageTitle = document.getElementById('page-title');
+
+    navItems.forEach(i => i.classList.toggle('active', i.getAttribute('data-section') === target));
+    sections.forEach(s => s.classList.toggle('active', s.id === `section-${target}`));
+    
+    state.activeSection = target;
+    if (pageTitle) pageTitle.textContent = target.charAt(0).toUpperCase() + target.slice(1);
+    if (target === 'statistik') renderDetailChart();
 }
 
 function initForms() {
@@ -105,36 +105,26 @@ function initForms() {
 
             showToast('Menyimpan...');
             try {
-                const response = await fetch(CONFIG.API_URL, {
-                    method: 'POST',
-                    body: JSON.stringify(formData)
-                });
-                const result = await response.json();
+                const res = await fetch(CONFIG.API_URL, { method: 'POST', body: JSON.stringify(formData) });
+                const result = await res.json();
                 if (result.status === 'success') {
                     showToast('Berhasil disimpan!');
                     clearPendingImage();
                     form.reset();
                     if (dateInput) dateInput.valueAsDate = new Date();
                     loadData();
-                } else {
-                    throw new Error(result.message);
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                showToast('Gagal: ' + error.message);
+                } else throw new Error(result.message);
+            } catch (err) {
+                showToast('Gagal: ' + err.message);
             }
         });
     }
 
-    const searchInput = document.getElementById('search-input');
-    if (searchInput) {
-        searchInput.addEventListener('input', (e) => renderTransactionList(e.target.value.toLowerCase()));
-    }
-
-    const removeReceiptBtn = document.getElementById('remove-receipt');
-    if (removeReceiptBtn) {
-        removeReceiptBtn.addEventListener('click', clearPendingImage);
-    }
+    const removeBtn = document.getElementById('remove-receipt');
+    if (removeBtn) removeBtn.addEventListener('click', clearPendingImage);
+    
+    const search = document.getElementById('search-input');
+    if (search) search.addEventListener('input', (e) => renderTransactionList(e.target.value.toLowerCase()));
 }
 
 function clearPendingImage() {
@@ -143,54 +133,60 @@ function clearPendingImage() {
     if (container) container.style.display = 'none';
 }
 
-// --- Camera Logic ---
+// --- Camera & Scan ---
 let cameraStream = null;
 
-function initCameraControls() {
-    const scanTrigger = document.getElementById('nav-scan-trigger');
+function initCameraHandlers() {
+    const scanBtn = document.getElementById('nav-scan-trigger');
     const closeBtn = document.getElementById('close-camera');
     const shutterBtn = document.getElementById('shutter-btn');
     
-    // Handle both bottom nav and any other capture buttons if they exist
-    if (scanTrigger) scanTrigger.addEventListener('click', startCamera);
-    
-    const legacyCaptureBtn = document.getElementById('capture-btn');
-    if (legacyCaptureBtn) legacyCaptureBtn.addEventListener('click', startCamera);
+    if (scanBtn) scanBtn.addEventListener('click', () => {
+        // Direct approach: If we are on mobile, use native camera by default for better compatibility
+        // unless they are specifically using a modern browser with good support.
+        if (isMobileDevice()) {
+            openNativeCamera();
+        } else {
+            startCamera();
+        }
+    });
 
     if (closeBtn) closeBtn.addEventListener('click', stopCamera);
     if (shutterBtn) shutterBtn.addEventListener('click', capturePhoto);
 }
 
+function isMobileDevice() {
+    return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
 async function startCamera() {
-    // Check if secure context
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        showToast("Membuka Kamera HP...");
         openNativeCamera();
         return;
     }
 
     const modal = document.getElementById('camera-modal');
     const video = document.getElementById('camera-stream');
-    
+
     try {
-        cameraStream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }, 
-            audio: false 
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' },
+            audio: false
         });
         video.srcObject = cameraStream;
         modal.classList.add('active');
-    } catch (err) {
-        console.error("Camera error:", err);
-        showToast("Gagal akses kamera, mencoba alternatif...");
+    } catch (e) {
+        console.error(e);
         openNativeCamera();
     }
 }
 
 function openNativeCamera() {
-    let input = document.createElement('input');
+    showToast("Membuka Kamera...");
+    const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    input.capture = 'environment';
+    input.capture = 'environment'; // This triggers the real camera app on mobile
     input.onchange = (e) => {
         const file = e.target.files[0];
         if (file) {
@@ -205,12 +201,12 @@ function openNativeCamera() {
 function stopCamera() {
     const modal = document.getElementById('camera-modal');
     if (cameraStream) {
-        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream.getTracks().forEach(t => t.stop());
         cameraStream = null;
     }
     const video = document.getElementById('camera-stream');
     if (video) video.srcObject = null;
-    if (modal) modal.classList.remove('active');
+    modal.classList.remove('active');
 }
 
 async function capturePhoto() {
@@ -229,39 +225,28 @@ async function capturePhoto() {
 function processScanResult(base64) {
     state.pendingImage = base64;
     
-    // Show Preview
-    const previewContainer = document.getElementById('receipt-preview-container');
-    const previewImg = document.getElementById('receipt-preview');
-    if (previewContainer && previewImg) {
-        previewImg.src = base64;
-        previewContainer.style.display = 'block';
+    // UI Feedback
+    const preview = document.getElementById('receipt-preview');
+    const container = document.getElementById('receipt-preview-container');
+    if (preview && container) {
+        preview.src = base64;
+        container.style.display = 'block';
     }
 
-    // Auto navigate to Transaction
-    const tNav = document.querySelectorAll('.nav-item[data-section="transaksi"]');
-    if (tNav.length > 0) {
-        tNav[0].click();
-    } else {
-        // Direct fallback UI switch
-        document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-        document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
-        document.getElementById('section-transaksi').classList.add('active');
-        state.activeSection = 'transaksi';
-    }
-    
+    // Go to form
+    switchSection('transaksi');
     showToast("Struk terbaca! Preview ada di form.");
 }
 
-// --- Data & Charts ---
+// --- Data Management ---
 async function loadData() {
     try {
-        const response = await fetch(`${CONFIG.API_URL}?action=getTransactions`);
-        const data = await response.json();
+        const res = await fetch(`${CONFIG.API_URL}?action=getTransactions`);
+        const data = await res.json();
         state.transactions = data;
         updateUI();
     } catch (e) {
-        console.error("Load error", e);
-        showToast("Gagal muat data dari spreadsheet.");
+        showToast("Gagal memuat data.");
     }
 }
 
@@ -272,16 +257,12 @@ function updateUI() {
 }
 
 function calculateSummary() {
-    const income = state.transactions.filter(t => t.jenis === 'pemasukan').reduce((s, t) => s + (parseFloat(t.nominal) || 0), 0);
-    const expense = state.transactions.filter(t => t.jenis === 'pengeluaran').reduce((s, t) => s + (parseFloat(t.nominal) || 0), 0);
+    const inc = state.transactions.filter(t => t.jenis === 'pemasukan').reduce((s, t) => s + (parseFloat(t.nominal) || 0), 0);
+    const exp = state.transactions.filter(t => t.jenis === 'pengeluaran').reduce((s, t) => s + (parseFloat(t.nominal) || 0), 0);
     
-    const balanceEl = document.getElementById('total-balance');
-    const inEl = document.getElementById('total-income');
-    const outEl = document.getElementById('total-expense');
-    
-    if (balanceEl) balanceEl.textContent = formatCurrency(income - expense);
-    if (inEl) inEl.textContent = formatCurrency(income);
-    if (outEl) outEl.textContent = formatCurrency(expense);
+    document.getElementById('total-balance').textContent = formatCurrency(inc - exp);
+    document.getElementById('total-income').textContent = formatCurrency(inc);
+    document.getElementById('total-expense').textContent = formatCurrency(exp);
 }
 
 function renderTransactionList(query = '') {
@@ -294,18 +275,13 @@ function renderTransactionList(query = '') {
         (t.catatan && t.catatan.toLowerCase().includes(query))
     );
 
-    if (filtered.length === 0) {
-        list.innerHTML = '<div class="text-center p-4">Tidak ada transaksi.</div>';
-        return;
-    }
-
     filtered.forEach(t => {
         const item = document.createElement('div');
         item.className = 'transaction-item';
         const photo = (t.foto && t.foto.startsWith('http')) ? `<a href="${t.foto}" target="_blank" class="t-photo-link" style="display:block; font-size:10px; color:var(--primary); margin-top:4px;">Lihat Struk</a>` : '';
         item.innerHTML = `
             <div class="t-info">
-                <span class="t-category">${t.kategori || 'N/A'}</span>
+                <span class="t-category">${t.kategori || 'Lainnya'}</span>
                 <span class="t-date">${new Date(t.tanggal).toLocaleDateString('id-ID')}</span>
                 ${photo}
             </div>
@@ -316,8 +292,7 @@ function renderTransactionList(query = '') {
 }
 
 function formatCurrency(n) {
-    const num = parseFloat(n) || 0;
-    return "Rp " + num.toLocaleString('id-ID');
+    return "Rp " + (parseFloat(n) || 0).toLocaleString('id-ID');
 }
 
 function showToast(m) {
@@ -329,7 +304,7 @@ function showToast(m) {
     }
 }
 
-// --- Charts Logic ---
+// --- Charts ---
 let catChart, trendChart, detailChart;
 function initCharts() {
     const catCtx = document.getElementById('categoryChart');
@@ -338,32 +313,31 @@ function initCharts() {
 
     catChart = new Chart(catCtx, {
         type: 'doughnut',
-        data: { labels: [], datasets: [{ data: [], backgroundColor: ['#4F46E5', '#06B6D4', '#10B981', '#F59E0B', '#EF4444'] }] },
+        data: { labels: [], datasets: [{ data: [] }] },
         options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
     });
 
     trendChart = new Chart(trendCtx, {
         type: 'bar',
-        data: { labels: ['Pemasukan', 'Pengeluaran'], datasets: [{ data: [0, 0], backgroundColor: ['#10B981', '#EF4444'] }] },
+        data: { labels: ['Pemasukan', 'Pengeluaran'], datasets: [{ data: [0, 0] }] },
         options: { responsive: true, plugins: { legend: { display: false } } }
     });
 }
 
 function updateCharts() {
     if (!catChart || !trendChart) return;
-    const items = state.transactions.filter(t => t.jenis === 'pengeluaran');
+    const expItems = state.transactions.filter(t => t.jenis === 'pengeluaran');
     const cats = {};
-    items.forEach(i => { 
-        const c = i.kategori || 'Lainnya';
-        cats[c] = (cats[c] || 0) + (parseFloat(i.nominal) || 0); 
-    });
-    catChart.data.labels = Object.keys(cats);
-    catChart.data.datasets[0].data = Object.values(cats);
+    expItems.forEach(i => { cats[i.kategori] = (cats[i.kategori] || 0) + (parseFloat(i.nominal) || 0); });
+    catChart.data.labels = Object.keys(cats).length ? Object.keys(cats) : ['Belum ada data'];
+    catChart.data.datasets[0].data = Object.values(cats).length ? Object.values(cats) : [0];
+    catChart.data.datasets[0].backgroundColor = ['#4F46E5', '#06B6D4', '#10B981', '#F59E0B', '#EF4444'];
     catChart.update();
 
     const inc = state.transactions.filter(t => t.jenis === 'pemasukan').reduce((s,t) => s+(parseFloat(t.nominal)||0), 0);
     const exp = state.transactions.filter(t => t.jenis === 'pengeluaran').reduce((s,t) => s+(parseFloat(t.nominal)||0), 0);
     trendChart.data.datasets[0].data = [inc, exp];
+    trendChart.data.datasets[0].backgroundColor = ['#10B981', '#EF4444'];
     trendChart.update();
 }
 
@@ -371,7 +345,6 @@ function renderDetailChart() {
     const ctx = document.getElementById('detailChart');
     if (!ctx) return;
     if (detailChart) detailChart.destroy();
-    
     const months = {};
     state.transactions.forEach(t => {
         const m = new Date(t.tanggal).toLocaleString('id-ID', { month: 'short' });
@@ -379,7 +352,6 @@ function renderDetailChart() {
         if (t.jenis === 'pemasukan') months[m].in += (parseFloat(t.nominal) || 0);
         else months[m].out += (parseFloat(t.nominal) || 0);
     });
-
     detailChart = new Chart(ctx, {
         type: 'line',
         data: {

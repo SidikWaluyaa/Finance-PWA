@@ -1,16 +1,11 @@
 /**
- * Google Apps Script - MyFinance Backend
+ * Google Apps Script - MyFinance Backend (v3)
  * 
- * Instructions:
- * 1. Create a new Google Sheet.
- * 2. Go to Extensions -> Apps Script.
- * 3. Paste this code and save.
- * 4. Deploy as Web App (Execute as: Me, Who has access: Anyone).
- * 5. Copy the Web App URL to app.js CONFIG.API_URL.
+ * - Saves images to the SAME FOLDER as this Spreadsheet.
+ * - Auto-creates 'Transaksi' sheet if missing.
  */
 
 const SHEET_NAME = 'Transaksi';
-const DRIVE_FOLDER_NAME = 'MyFinance Receipts';
 
 function doGet(e) {
   const action = e.parameter.action;
@@ -74,13 +69,16 @@ function doPost(e) {
 }
 
 function uploadToDrive(base64Data, filename) {
+  // Get the folder where the Spreadsheet is located
+  const ssFile = DriveApp.getFileById(SpreadsheetApp.getActiveSpreadsheet().getId());
+  const parentFolders = ssFile.getParents();
   let folder;
-  const folders = DriveApp.getFoldersByName(DRIVE_FOLDER_NAME);
   
-  if (folders.hasNext()) {
-    folder = folders.next();
+  if (parentFolders.hasNext()) {
+    folder = parentFolders.next();
   } else {
-    folder = DriveApp.createFolder(DRIVE_FOLDER_NAME);
+    // Fallback to Root if somehow no parent
+    folder = DriveApp.getRootFolder();
   }
 
   const contentType = base64Data.substring(5, base64Data.indexOf(';'));
@@ -88,7 +86,7 @@ function uploadToDrive(base64Data, filename) {
   const blob = Utilities.newBlob(bytes, contentType, filename);
   const file = folder.createFile(blob);
   
-  // Make file readable by anyone with the link so it can be previewed
+  // Set permission so PWA can display it
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   
   return file.getUrl();
