@@ -23,6 +23,7 @@ const CATEGORY_MAP = {
 let state = {
     transactions: [],
     theme: localStorage.getItem('theme') || 'light',
+    zoom: localStorage.getItem('zoom') || 16,
     activeSection: 'dashboard',
     budgets: JSON.parse(localStorage.getItem('budgets')) || {},
     editingId: null
@@ -31,7 +32,7 @@ let state = {
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
     initPWA();
-    initTheme();
+    initSettings();
     initNavigation();
     initForms();
     initCharts();
@@ -68,7 +69,8 @@ function initPWA() {
     }
 }
 
-function initTheme() {
+function initSettings() {
+    // Theme Logic
     const toggle = document.getElementById('dark-mode-toggle');
     if (state.theme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
     if (toggle) {
@@ -77,6 +79,26 @@ function initTheme() {
             state.theme = e.target.checked ? 'dark' : 'light';
             document.documentElement.setAttribute('data-theme', state.theme);
             localStorage.setItem('theme', state.theme);
+        });
+    }
+
+    // Zoom Logic
+    const zoomSlider = document.getElementById('zoom-slider');
+    const zoomText = document.getElementById('zoom-level-text');
+    
+    // Apply initial zoom
+    document.documentElement.style.fontSize = state.zoom + 'px';
+    
+    if (zoomSlider) {
+        zoomSlider.value = state.zoom;
+        if (zoomText) zoomText.textContent = Math.round((state.zoom / 16) * 100) + '%';
+        
+        zoomSlider.addEventListener('input', (e) => {
+            const val = e.target.value;
+            state.zoom = val;
+            document.documentElement.style.fontSize = val + 'px';
+            if (zoomText) zoomText.textContent = Math.round((val / 16) * 100) + '%';
+            localStorage.setItem('zoom', val);
         });
     }
 }
