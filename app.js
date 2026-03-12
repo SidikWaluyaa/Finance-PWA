@@ -1,5 +1,5 @@
 /**
- * MyFinance App - Core Logic (Consolidated & Improved Camera)
+ * MyFinance App - Core Logic (v2 - Fixed Scan & Feedback)
  */
 
 const CONFIG = {
@@ -23,6 +23,21 @@ document.addEventListener('DOMContentLoaded', () => {
     initCharts();
     initCameraControls();
     loadData();
+    
+    // Force Refresh button
+    const refreshBtn = document.getElementById('force-refresh-btn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', () => {
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(registrations => {
+                    for(let registration of registrations) { registration.unregister(); }
+                    window.location.reload(true);
+                });
+            } else {
+                window.location.reload(true);
+            }
+        });
+    }
 });
 
 function initPWA() {
@@ -97,7 +112,7 @@ function initForms() {
                 const result = await response.json();
                 if (result.status === 'success') {
                     showToast('Berhasil disimpan!');
-                    state.pendingImage = null;
+                    clearPendingImage();
                     form.reset();
                     if (dateInput) dateInput.valueAsDate = new Date();
                     loadData();
@@ -115,6 +130,17 @@ function initForms() {
     if (searchInput) {
         searchInput.addEventListener('input', (e) => renderTransactionList(e.target.value.toLowerCase()));
     }
+
+    const removeReceiptBtn = document.getElementById('remove-receipt');
+    if (removeReceiptBtn) {
+        removeReceiptBtn.addEventListener('click', clearPendingImage);
+    }
+}
+
+function clearPendingImage() {
+    state.pendingImage = null;
+    const container = document.getElementById('receipt-preview-container');
+    if (container) container.style.display = 'none';
 }
 
 // --- Camera Logic ---
@@ -124,26 +150,19 @@ function initCameraControls() {
     const scanTrigger = document.getElementById('nav-scan-trigger');
     const closeBtn = document.getElementById('close-camera');
     const shutterBtn = document.getElementById('shutter-btn');
-    const uploadInput = document.getElementById('upload-receipt');
-
+    
+    // Handle both bottom nav and any other capture buttons if they exist
     if (scanTrigger) scanTrigger.addEventListener('click', startCamera);
+    
+    const legacyCaptureBtn = document.getElementById('capture-btn');
+    if (legacyCaptureBtn) legacyCaptureBtn.addEventListener('click', startCamera);
+
     if (closeBtn) closeBtn.addEventListener('click', stopCamera);
     if (shutterBtn) shutterBtn.addEventListener('click', capturePhoto);
-
-    // Add upload button functionality in Profile or Dashboard to handle files
-    if (uploadInput) {
-        uploadInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (ev) => processScanResult(ev.target.result);
-            reader.readAsDataURL(file);
-        });
-    }
 }
 
 async function startCamera() {
-    // If NOT HTTPS, fallback immediately to native file input
+    // Check if secure context
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         showToast("Membuka Kamera HP...");
         openNativeCamera();
@@ -168,7 +187,6 @@ async function startCamera() {
 }
 
 function openNativeCamera() {
-    // Create a temporary hidden input to trigger the actual camera app
     let input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
@@ -192,7 +210,7 @@ function stopCamera() {
     }
     const video = document.getElementById('camera-stream');
     if (video) video.srcObject = null;
-    modal.classList.remove('active');
+    if (modal) modal.classList.remove('active');
 }
 
 async function capturePhoto() {
@@ -211,14 +229,30 @@ async function capturePhoto() {
 function processScanResult(base64) {
     state.pendingImage = base64;
     
+    // Show Preview
+    const previewContainer = document.getElementById('receipt-preview-container');
+    const previewImg = document.getElementById('receipt-preview');
+    if (previewContainer && previewImg) {
+        previewImg.src = base64;
+        previewContainer.style.display = 'block';
+    }
+
     // Auto navigate to Transaction
-    const tNav = document.querySelector('[data-section="transaksi"]');
-    if (tNav) tNav.click();
+    const tNav = document.querySelectorAll('.nav-item[data-section="transaksi"]');
+    if (tNav.length > 0) {
+        tNav[0].click();
+    } else {
+        // Direct fallback UI switch
+        document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+        document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
+        document.getElementById('section-transaksi').classList.add('active');
+        state.activeSection = 'transaksi';
+    }
     
-    showToast("Struk terbaca! Silakan isi detail.");
+    showToast("Struk terbaca! Preview ada di form.");
 }
 
-// --- Data & Charts (Simplified) ---
+// --- Data & Charts ---
 async function loadData() {
     try {
         const response = await fetch(`${CONFIG.API_URL}?action=getTransactions`);
@@ -227,7 +261,7 @@ async function loadData() {
         updateUI();
     } catch (e) {
         console.error("Load error", e);
-        showToast("Offline / Gagal muat data.");
+        showToast("Gagal muat data dari spreadsheet.");
     }
 }
 
@@ -238,8 +272,8 @@ function updateUI() {
 }
 
 function calculateSummary() {
-    const income = state.transactions.filter(t => t.jenis === 'pemasukan').reduce((s, t) => s + (t.nominal || 0), 0);
-    const expense = state.transactions.filter(t => t.jenis === 'pengeluaran').reduce((s, t) => s + (t.nominal || 0), 0);
+    const income = state.transactions.filter(t => t.jenis === 'pemasukan').reduce((s, t) => s + (parseFloat(t.nominal) || 0), 0);
+    const expense = state.transactions.filter(t => t.jenis === 'pengeluaran').reduce((s, t) => s + (parseFloat(t.nominal) || 0), 0);
     
     const balanceEl = document.getElementById('total-balance');
     const inEl = document.getElementById('total-income');
@@ -260,13 +294,18 @@ function renderTransactionList(query = '') {
         (t.catatan && t.catatan.toLowerCase().includes(query))
     );
 
+    if (filtered.length === 0) {
+        list.innerHTML = '<div class="text-center p-4">Tidak ada transaksi.</div>';
+        return;
+    }
+
     filtered.forEach(t => {
         const item = document.createElement('div');
         item.className = 'transaction-item';
-        const photo = t.foto ? `<a href="${t.foto}" target="_blank" class="t-photo-link" style="display:block; font-size:10px; color:var(--primary); margin-top:4px;">Lihat Struk</a>` : '';
+        const photo = (t.foto && t.foto.startsWith('http')) ? `<a href="${t.foto}" target="_blank" class="t-photo-link" style="display:block; font-size:10px; color:var(--primary); margin-top:4px;">Lihat Struk</a>` : '';
         item.innerHTML = `
             <div class="t-info">
-                <span class="t-category">${t.kategori || 'Uncategorized'}</span>
+                <span class="t-category">${t.kategori || 'N/A'}</span>
                 <span class="t-date">${new Date(t.tanggal).toLocaleDateString('id-ID')}</span>
                 ${photo}
             </div>
@@ -277,7 +316,8 @@ function renderTransactionList(query = '') {
 }
 
 function formatCurrency(n) {
-    return "Rp " + (n || 0).toLocaleString('id-ID');
+    const num = parseFloat(n) || 0;
+    return "Rp " + num.toLocaleString('id-ID');
 }
 
 function showToast(m) {
@@ -313,13 +353,16 @@ function updateCharts() {
     if (!catChart || !trendChart) return;
     const items = state.transactions.filter(t => t.jenis === 'pengeluaran');
     const cats = {};
-    items.forEach(i => { cats[i.kategori] = (cats[i.kategori] || 0) + (i.nominal || 0); });
+    items.forEach(i => { 
+        const c = i.kategori || 'Lainnya';
+        cats[c] = (cats[c] || 0) + (parseFloat(i.nominal) || 0); 
+    });
     catChart.data.labels = Object.keys(cats);
     catChart.data.datasets[0].data = Object.values(cats);
     catChart.update();
 
-    const inc = state.transactions.filter(t => t.jenis === 'pemasukan').reduce((s,t) => s+(t.nominal||0), 0);
-    const exp = state.transactions.filter(t => t.jenis === 'pengeluaran').reduce((s,t) => s+(t.nominal||0), 0);
+    const inc = state.transactions.filter(t => t.jenis === 'pemasukan').reduce((s,t) => s+(parseFloat(t.nominal)||0), 0);
+    const exp = state.transactions.filter(t => t.jenis === 'pengeluaran').reduce((s,t) => s+(parseFloat(t.nominal)||0), 0);
     trendChart.data.datasets[0].data = [inc, exp];
     trendChart.update();
 }
@@ -333,8 +376,8 @@ function renderDetailChart() {
     state.transactions.forEach(t => {
         const m = new Date(t.tanggal).toLocaleString('id-ID', { month: 'short' });
         if (!months[m]) months[m] = { in: 0, out: 0 };
-        if (t.jenis === 'pemasukan') months[m].in += t.nominal;
-        else months[m].out += t.nominal;
+        if (t.jenis === 'pemasukan') months[m].in += (parseFloat(t.nominal) || 0);
+        else months[m].out += (parseFloat(t.nominal) || 0);
     });
 
     detailChart = new Chart(ctx, {

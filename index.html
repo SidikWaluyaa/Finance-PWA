@@ -82,6 +82,13 @@
                             <label>Catatan</label>
                             <textarea id="t-note" placeholder="Tambahkan catatan..."></textarea>
                         </div>
+                        <div id="receipt-preview-container" style="display: none; margin-bottom: 1rem;">
+                            <label>Preview Struk</label>
+                            <div style="position: relative;">
+                                <img id="receipt-preview" src="" style="width: 100%; border-radius: 12px; border: 1px solid var(--border);">
+                                <button type="button" id="remove-receipt" style="position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.5); color: white; border: none; border-radius: 50%; width: 30px; height: 30px; cursor: pointer;">×</button>
+                            </div>
+                        </div>
                         <button type="submit" class="btn btn-primary">Simpan Transaksi</button>
                     </form>
                 </div>
@@ -128,6 +135,9 @@
                     <div class="setting-item">
                         <span>Currency</span>
                         <span>IDR (Rp)</span>
+                    </div>
+                    <div class="setting-item">
+                        <button id="force-refresh-btn" class="btn btn-outline" style="margin-top: 1rem;">Update / Refresh App</button>
                     </div>
                 </div>
             </section>
