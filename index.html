@@ -11,6 +11,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
     <div id="app">
@@ -159,11 +161,11 @@
                     </div>
                     <div class="setting-item">
                         <span>Laporan Keuangan</span>
-                        <button id="export-csv-btn" class="btn btn-outline" style="width: auto; padding: 0.5rem 1rem;">Download CSV</button>
+                        <button id="export-pdf-btn" class="btn btn-outline" style="width: auto; padding: 0.5rem 1rem;">Download PDF</button>
                     </div>
                     <div class="setting-item">
                         <span>Versi Aplikasi</span>
-                        <span style="color: var(--text-light);">v4.0.0</span>
+                        <span style="color: var(--text-light);">v5.0.0</span>
                     </div>
                     <div class="setting-item">
                         <button id="force-refresh-btn" class="btn btn-outline" style="margin-top: 1rem;">Update / Refresh App</button>

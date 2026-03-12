@@ -52,8 +52,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    const exportBtn = document.getElementById('export-csv-btn');
-    if (exportBtn) exportBtn.addEventListener('click', exportToCSV);
+    const exportBtn = document.getElementById('export-pdf-btn');
+    if (exportBtn) exportBtn.addEventListener('click', exportToPDF);
 
     const saveBudgetBtn = document.getElementById('save-budget-btn');
     if (saveBudgetBtn) saveBudgetBtn.addEventListener('click', saveBudget);
@@ -315,21 +315,121 @@ function saveBudget() {
     }
 }
 
-function exportToCSV() {
-    if (state.transactions.length === 0) return;
-    
-    let csv = 'ID,Tanggal,Jenis,Kategori,Nominal,Catatan\n';
-    state.transactions.forEach(t => {
-        csv += `${t.id},${t.tanggal},${t.jenis},${t.kategori},${t.nominal},"${t.catatan}"\n`;
+function exportToPDF() {
+    if (state.transactions.length === 0) {
+        showToast('Tidak ada data untuk diexport.');
+        return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    // Set Document Properties
+    doc.setProperties({
+        title: 'Laporan Keuangan MyFinance',
+        subject: 'Laporan Transaksi',
+        creator: 'MyFinance PWA'
     });
 
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Keuangan_${new Date().toLocaleDateString()}.csv`;
-    a.click();
-    showToast('Laporan diunduh!');
+    // Premium Header Design
+    doc.setFillColor(79, 70, 229); // Primary color
+    doc.rect(0, 0, 210, 40, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(24);
+    doc.text("MyFinance", 15, 20);
+    
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "normal");
+    doc.text("Laporan Keuangan", 15, 30);
+    
+    doc.setFontSize(10);
+    const dateStr = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    doc.text(`Tanggal Cetak: ${dateStr}`, 195, 20, { align: 'right' });
+
+    // Financial Summary Section
+    const inc = state.transactions.filter(t => t.jenis === 'pemasukan').reduce((s, t) => s + (parseFloat(t.nominal) || 0), 0);
+    const exp = state.transactions.filter(t => t.jenis === 'pengeluaran').reduce((s, t) => s + (parseFloat(t.nominal) || 0), 0);
+    const bal = inc - exp;
+
+    doc.setTextColor(50, 50, 50);
+    doc.setFontSize(12);
+    doc.text("Ringkasan Total:", 15, 50);
+    
+    doc.setFontSize(10);
+    doc.text(`Total Pemasukan: ${formatCurrency(inc)}`, 15, 58);
+    doc.text(`Total Pengeluaran: ${formatCurrency(exp)}`, 15, 64);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Saldo Akhir: ${formatCurrency(bal)}`, 15, 70);
+    doc.setFont("helvetica", "normal");
+
+    // Line Separator
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.5);
+    doc.line(15, 75, 195, 75);
+
+    // Prepare Table Data
+    const tableBody = state.transactions.map((t, idx) => [
+        idx + 1,
+        new Date(t.tanggal).toLocaleDateString('id-ID'),
+        t.jenis === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran',
+        t.kategori || '-',
+        formatCurrency(t.nominal),
+        t.catatan || '-'
+    ]);
+
+    // Enhanced AutoTable Styling
+    doc.autoTable({
+        startY: 85,
+        head: [['No', 'Tanggal', 'Jenis', 'Kategori', 'Nominal', 'Catatan']],
+        body: tableBody,
+        theme: 'striped',
+        headStyles: {
+            fillColor: [79, 70, 229],
+            textColor: 255,
+            fontStyle: 'bold',
+            halign: 'center'
+        },
+        columnStyles: {
+            0: { halign: 'center', cellWidth: 15 },
+            2: { halign: 'center' },
+            4: { halign: 'right' } // Align nominal right
+        },
+        styles: {
+            fontSize: 9,
+            cellPadding: 4,
+            lineWidth: 0.1,
+            lineColor: [220, 220, 220]
+        },
+        alternateRowStyles: {
+            fillColor: [248, 250, 252] // Light background for striped effect
+        },
+        didParseCell: function(data) {
+            // Apply color to amounts based on income/expense
+            if (data.section === 'body' && data.column.index === 4) {
+                const isIncome = data.row.raw[2] === 'Pemasukan';
+                if (isIncome) {
+                    data.cell.styles.textColor = [16, 185, 129]; // Green
+                } else {
+                    data.cell.styles.textColor = [239, 68, 68]; // Red
+                }
+            }
+        }
+    });
+
+    // Add Footer with Page Numbers
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`Dibuat oleh MyFinance PWA - Halaman ${i} dari ${pageCount}`, doc.internal.pageSize.width / 2, doc.internal.pageSize.height - 10, { align: 'center' });
+    }
+
+    // Save PDF
+    doc.save(`Laporan_Keuangan_${new Date().getTime()}.pdf`);
+    showToast('PDF Laporan berhasil diunduh!');
 }
 
 function formatCurrency(n) {

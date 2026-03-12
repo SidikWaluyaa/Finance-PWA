@@ -61,33 +61,57 @@ body {
     position: sticky;
     top: 0;
     z-index: 10;
-    background-color: var(--background);
+    background: rgba(248, 250, 252, 0.85); /* Glassmorphism */
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(226, 232, 240, 0.5);
+    transition: background-color 0.3s ease;
+}
+
+[data-theme="dark"] .app-header {
+    background: rgba(15, 23, 42, 0.85);
+    border-bottom: 1px solid rgba(51, 65, 85, 0.5);
 }
 
 .app-header h1 {
     font-size: 1.5rem;
     font-weight: 700;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 
 .icon-btn {
-    background: none;
-    border: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
     color: var(--text);
     cursor: pointer;
-    width: 40px;
-    height: 40px;
+    width: 42px;
+    height: 42px;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
     transition: var(--transition);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.icon-btn:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transform: translateY(-1px);
+}
+
+.icon-btn:active {
+    background-color: rgba(0, 0, 0, 0.05);
+    transform: scale(0.95);
 }
 
 /* Page Sections */
 main {
     flex: 1;
     overflow-y: auto;
-    padding: 0 1.25rem 6rem;
+    padding: 1rem 1.25rem 6rem;
     scrollbar-width: none;
 }
 
@@ -95,13 +119,13 @@ main::-webkit-scrollbar { display: none; }
 
 .page-section {
     display: none;
-    animation: fadeIn 0.4s ease-out;
+    animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .page-section.active { display: block; }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
+    from { opacity: 0; transform: translateY(15px); }
     to { opacity: 1; transform: translateY(0); }
 }
 
@@ -109,22 +133,71 @@ main::-webkit-scrollbar { display: none; }
 .card {
     background: var(--surface);
     border-radius: var(--radius);
-    padding: 1.25rem;
-    margin-bottom: 1rem;
-    box-shadow: var(--shadow);
-    border: 1px solid var(--border);
+    padding: 1.5rem;
+    margin-bottom: 1.25rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+[data-theme="dark"] .card {
+    border-color: rgba(51, 65, 85, 0.8);
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 20px -3px rgba(0, 0, 0, 0.08), 0 6px 8px -2px rgba(0, 0, 0, 0.04);
 }
 
 .primary-card {
-    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
     color: white;
-    padding: 2rem 1.5rem;
+    padding: 2.5rem 1.5rem;
+    border: none;
+    position: relative;
+    overflow: hidden;
+}
+
+.primary-card::before {
+    content: '';
+    position: absolute;
+    top: -50px;
+    right: -50px;
+    width: 150px;
+    height: 150px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+}
+
+.primary-card::after {
+    content: '';
+    position: absolute;
+    bottom: -30px;
+    left: -20px;
+    width: 100px;
+    height: 100px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 50%;
+}
+
+.primary-card .label {
+    position: relative;
+    z-index: 2;
+    opacity: 0.9;
+}
+
+.primary-card h2 {
+    position: relative;
+    z-index: 2;
+    font-size: 2.2rem;
+    margin-top: 0.5rem;
+    letter-spacing: -0.5px;
 }
 
 .stats-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1rem;
+    gap: 1.25rem;
 }
 
 /* Transaction List with Icons */
