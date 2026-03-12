@@ -12,7 +12,8 @@ const CONFIG = {
 let state = {
     transactions: [],
     theme: localStorage.getItem('theme') || 'light',
-    activeSection: 'dashboard'
+    activeSection: 'dashboard',
+    pendingImage: null
 };
 
 // --- Initialization ---
@@ -22,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initNavigation();
     initForms();
     initCharts();
+    initCameraHandlers();
     loadData(); // Initial load
 });
 
@@ -66,7 +68,8 @@ function initNavigation() {
 
             // Update Section UI
             sections.forEach(s => s.classList.remove('active'));
-            document.getElementById(`section-${targetSection}`).classList.add('active');
+            const targetEl = document.getElementById(`section-${targetSection}`);
+            if (targetEl) targetEl.classList.add('active');
 
             // Update Title
             state.activeSection = targetSection;
@@ -80,8 +83,52 @@ function initNavigation() {
 
 // --- Form Handling ---
 function initForms() {
+    const form = document.getElementById('transaction-form');
     // Set default date to today
-    document.getElementById('t-date').valueAsDate = new Date();
+    const dateInput = document.getElementById('t-date');
+    if (dateInput) dateInput.valueAsDate = new Date();
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const formData = {
+            action: 'addTransaction',
+            tanggal: document.getElementById('t-date').value,
+            jenis: document.getElementById('t-type').value,
+            kategori: document.getElementById('t-category').value,
+            nominal: parseFloat(document.getElementById('t-amount').value),
+            catatan: document.getElementById('t-note').value,
+            image: state.pendingImage || null
+        };
+
+        showToast('Menyimpan transaksi...');
+        
+        try {
+            if (CONFIG.API_URL.includes('REPLACE_WITH_YOUR_SCRIPT_ID')) {
+                showToast('Tersimpan secara lokal (Harap konfigurasi API URL)');
+                state.transactions.unshift({ ...formData, id: Date.now(), foto: formData.image ? 'local_preview' : '' });
+            } else {
+                const response = await fetch(CONFIG.API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(formData)
+                });
+                const result = await response.json();
+                if (result.status === 'success') {
+                    showToast('Berhasil disimpan!');
+                    loadData(); // Refresh
+                } else {
+                    throw new Error(result.message || 'Gagal menyimpan');
+                }
+            }
+            state.pendingImage = null;
+            form.reset();
+            if (dateInput) dateInput.valueAsDate = new Date();
+            updateUI();
+        } catch (error) {
+            console.error('Error:', error);
+            showToast('Gagal menyimpan: ' + error.message);
+        }
+    });
 
     // Search & Filter
     document.getElementById('search-input').addEventListener('input', (e) => {
@@ -100,9 +147,8 @@ async function loadData() {
         } else {
             // Use dummy data if API not set
             state.transactions = [
-                { id: 1, tanggal: '2024-03-01', jenis: 'pemasukan', kategori: 'Gaji', nominal: 5000000, catatan: 'Gaji Bulanan' },
-                { id: 2, tanggal: '2024-03-02', jenis: 'pengeluaran', kategori: 'Makanan', nominal: 150000, catatan: 'Makan Siang' },
-                { id: 3, tanggal: '2024-03-03', jenis: 'pengeluaran', kategori: 'Transport', nominal: 50000, catatan: 'Ojek Online' }
+                { id: 1, tanggal: '2024-03-01', jenis: 'pemasukan', kategori: 'Gaji', nominal: 5000000, catatan: 'Gaji Bulanan', foto: '' },
+                { id: 2, tanggal: '2024-03-02', jenis: 'pengeluaran', kategori: 'Makanan', nominal: 150000, catatan: 'Makan Siang', foto: '' }
             ];
         }
         updateUI();
@@ -139,8 +185,8 @@ function renderTransactionList(query = '') {
     list.innerHTML = '';
 
     const filtered = state.transactions.filter(t => 
-        t.kategori.toLowerCase().includes(query) || 
-        t.catatan.toLowerCase().includes(query)
+        (t.kategori && t.kategori.toLowerCase().includes(query)) || 
+        (t.catatan && t.catatan.toLowerCase().includes(query))
     );
 
     if (filtered.length === 0) {
@@ -151,10 +197,16 @@ function renderTransactionList(query = '') {
     filtered.forEach(t => {
         const item = document.createElement('div');
         item.className = 'transaction-item';
+        const photoLink = t.foto ? `
+            <a href="${t.foto}" target="_blank" class="t-photo-link" style="display:block; font-size:10px; color:var(--primary); margin-top:4px;">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg> Lihat Struk
+            </a>` : '';
+
         item.innerHTML = `
             <div class="t-info">
                 <span class="t-category">${t.kategori}</span>
                 <span class="t-date">${new Date(t.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                ${photoLink}
             </div>
             <div class="t-amount ${t.jenis}">
                 ${t.jenis === 'pemasukan' ? '+' : '-'} ${formatCurrency(t.nominal)}
@@ -231,7 +283,6 @@ function renderDetailChart() {
     const ctxDetail = document.getElementById('detailChart').getContext('2d');
     if (detailChart) detailChart.destroy();
 
-    // Group by month (simplified)
     const monthlyData = {};
     state.transactions.forEach(t => {
         const month = new Date(t.tanggal).toLocaleString('id-ID', { month: 'short' });
@@ -255,6 +306,7 @@ function renderDetailChart() {
 
 // --- Utilities ---
 function formatCurrency(num) {
+    if (isNaN(num)) return 'Rp 0';
     return new Intl.NumberFormat('id-ID', {
         style: 'currency',
         currency: 'IDR',
@@ -272,10 +324,41 @@ function showToast(message) {
 // --- Camera & Scan Logic ---
 let cameraStream = null;
 
+function initCameraHandlers() {
+    const captureBtn = document.getElementById('capture-btn');
+    const closeCameraBtn = document.getElementById('close-camera');
+    const shutterBtn = document.getElementById('shutter-btn');
+    const uploadInput = document.getElementById('upload-receipt');
+
+    if (captureBtn) captureBtn.addEventListener('click', startCamera);
+    if (closeCameraBtn) closeCameraBtn.addEventListener('click', stopCamera);
+    if (shutterBtn) shutterBtn.addEventListener('click', capturePhoto);
+
+    if (uploadInput) {
+        uploadInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            showToast("Membaca file...");
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                processScanResult(event.target.result);
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+}
+
 async function startCamera() {
     const modal = document.getElementById('camera-modal');
     const video = document.getElementById('camera-stream');
     
+    // Check if secure context (HTTPS/Localhost)
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showToast("Fitur kamera membutuhkan koneksi HTTPS.");
+        return;
+    }
+
     try {
         cameraStream = await navigator.mediaDevices.getUserMedia({ 
             video: { facingMode: 'environment' }, 
@@ -285,7 +368,7 @@ async function startCamera() {
         modal.classList.add('active');
     } catch (err) {
         console.error("Camera error:", err);
-        showToast("Browser tidak mengizinkan akses kamera.");
+        showToast("Gagal mengakses kamera: " + err.message);
     }
 }
 
@@ -306,117 +389,34 @@ async function capturePhoto() {
     const canvas = document.getElementById('capture-canvas');
     const context = canvas.getContext('2d');
 
-    // Match canvas size to video frame
+    if (!video.videoWidth) {
+        showToast("Tunggu kamera aktif...");
+        return;
+    }
+
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    const base64Image = canvas.toDataURL('image/jpeg', 0.8);
+    const base64Image = canvas.toDataURL('image/jpeg', 0.7);
     stopCamera();
-    
-    // Switch to Transaction section and pre-fill photo
-    showToast("Mengunggah struk...");
     processScanResult(base64Image);
 }
 
 function processScanResult(base64Image) {
+    // Save to state
+    state.pendingImage = base64Image;
+
     // Navigate to transaction form
     const navItems = document.querySelectorAll('.nav-item');
     navItems.forEach(i => i.classList.remove('active'));
-    document.querySelector('[data-section="transaksi"]').classList.add('active');
+    const tNav = document.querySelector('[data-section="transaksi"]');
+    if (tNav) tNav.classList.add('active');
     
     document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
-    document.getElementById('section-transaksi').classList.add('active');
+    const tSection = document.getElementById('section-transaksi');
+    if (tSection) tSection.classList.add('active');
     state.activeSection = 'transaksi';
 
-    // Store image base64 in a hidden way or global state for next submit
-    state.pendingImage = base64Image;
-    showToast("Struk diproses! Silakan isi detail transaksi.");
+    showToast("Struk siap! Silakan isi detail transaksi.");
 }
-
-// Update existing form submission to include image
-// (Replacing the submit handler in initForms)
-function attachSubmitHandler() {
-    const form = document.getElementById('transaction-form');
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const formData = {
-            action: 'addTransaction',
-            tanggal: document.getElementById('t-date').value,
-            jenis: document.getElementById('t-type').value,
-            kategori: document.getElementById('t-category').value,
-            nominal: parseFloat(document.getElementById('t-amount').value),
-            catatan: document.getElementById('t-note').value,
-            image: state.pendingImage || null
-        };
-
-        showToast('Menyimpan transaksi...');
-        
-        try {
-            if (CONFIG.API_URL.includes('REPLACE_WITH_YOUR_SCRIPT_ID')) {
-                showToast('Tersimpan secara lokal (Harap konfigurasi API URL)');
-                // Mock success for local UI
-                state.transactions.unshift({ ...formData, id: Date.now(), foto: formData.image ? 'local_preview' : '' });
-            } else {
-                const response = await fetch(CONFIG.API_URL, {
-                    method: 'POST',
-                    body: JSON.stringify(formData)
-                });
-                const result = await response.json();
-                if (result.status === 'success') {
-                    showToast('Berhasil disimpan dengan foto!');
-                    loadData(); // Refresh from server
-                }
-            }
-            state.pendingImage = null; // Clear after use
-            form.reset();
-            document.getElementById('t-date').valueAsDate = new Date();
-            updateUI();
-        } catch (error) {
-            console.error('Error:', error);
-            showToast('Gagal terhubung ke server.');
-        }
-    });
-}
-
-// Update renderTransactionList to show Photo link if exists
-function renderTransactionList(query = '') {
-    const list = document.getElementById('transaction-list');
-    list.innerHTML = '';
-
-    const filtered = state.transactions.filter(t => 
-        (t.kategori && t.kategori.toLowerCase().includes(query)) || 
-        (t.catatan && t.catatan.toLowerCase().includes(query))
-    );
-
-    filtered.forEach(t => {
-        const item = document.createElement('div');
-        item.className = 'transaction-item';
-        const photoIcon = t.foto ? `
-            <a href="${t.foto}" target="_blank" class="t-photo-link">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg> Lihat Struk
-            </a>` : '';
-
-        item.innerHTML = `
-            <div class="t-info">
-                <span class="t-category">${t.kategori}</span>
-                <span class="t-date">${new Date(t.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                ${photoIcon}
-            </div>
-            <div class="t-amount ${t.jenis}">
-                ${t.jenis === 'pemasukan' ? '+' : '-'} ${formatCurrency(t.nominal)}
-            </div>
-        `;
-        list.appendChild(item);
-    });
-}
-
-// Update initialization to set up camera event listeners
-// (Adding this to the end of app.js)
-document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('capture-btn').addEventListener('click', startCamera);
-    document.getElementById('close-camera').addEventListener('click', stopCamera);
-    document.getElementById('shutter-btn').addEventListener('click', capturePhoto);
-    attachSubmitHandler();
-});
