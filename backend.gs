@@ -1,8 +1,11 @@
 /**
- * Google Apps Script - MyFinance Backend (v3)
+ * Google Apps Script - MyFinance Backend (Simplified Revert)
  * 
- * - Saves images to the SAME FOLDER as this Spreadsheet.
- * - Auto-creates 'Transaksi' sheet if missing.
+ * Instructions:
+ * 1. Create a new Google Sheet.
+ * 2. Go to Extensions -> Apps Script.
+ * 3. Paste this code and save.
+ * 4. Deploy as Web App (Execute as: Me, Who has access: Anyone).
  */
 
 const SHEET_NAME = 'Transaksi';
@@ -14,7 +17,7 @@ function doGet(e) {
   
   if (!sheet) {
     sheet = ss.insertSheet(SHEET_NAME);
-    sheet.appendRow(['ID', 'Tanggal', 'Jenis', 'Kategori', 'Nominal', 'Catatan', 'Foto', 'Timestamp']);
+    sheet.appendRow(['ID', 'Tanggal', 'Jenis', 'Kategori', 'Nominal', 'Catatan', 'Timestamp']);
   }
 
   if (action === 'getTransactions') {
@@ -38,12 +41,7 @@ function doPost(e) {
     
     if (!sheet) {
       sheet = ss.insertSheet(SHEET_NAME);
-      sheet.appendRow(['ID', 'Tanggal', 'Jenis', 'Kategori', 'Nominal', 'Catatan', 'Foto', 'Timestamp']);
-    }
-
-    let photoUrl = '';
-    if (data.image) {
-      photoUrl = uploadToDrive(data.image, `Receipt_${new Date().getTime()}.jpg`);
+      sheet.appendRow(['ID', 'Tanggal', 'Jenis', 'Kategori', 'Nominal', 'Catatan', 'Timestamp']);
     }
 
     const id = new Date().getTime();
@@ -56,38 +54,13 @@ function doPost(e) {
       data.kategori,
       data.nominal,
       data.catatan,
-      photoUrl,
       timestamp
     ]);
 
-    return ContentService.createTextOutput(JSON.stringify({ status: 'success', id: id, photoUrl: photoUrl }))
+    return ContentService.createTextOutput(JSON.stringify({ status: 'success', id: id }))
       .setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: err.toString() }))
       .setMimeType(ContentService.MimeType.JSON);
   }
-}
-
-function uploadToDrive(base64Data, filename) {
-  // Get the folder where the Spreadsheet is located
-  const ssFile = DriveApp.getFileById(SpreadsheetApp.getActiveSpreadsheet().getId());
-  const parentFolders = ssFile.getParents();
-  let folder;
-  
-  if (parentFolders.hasNext()) {
-    folder = parentFolders.next();
-  } else {
-    // Fallback to Root if somehow no parent
-    folder = DriveApp.getRootFolder();
-  }
-
-  const contentType = base64Data.substring(5, base64Data.indexOf(';'));
-  const bytes = Utilities.base64Decode(base64Data.split(',')[1]);
-  const blob = Utilities.newBlob(bytes, contentType, filename);
-  const file = folder.createFile(blob);
-  
-  // Set permission so PWA can display it
-  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  
-  return file.getUrl();
 }

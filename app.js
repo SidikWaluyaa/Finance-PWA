@@ -1,5 +1,5 @@
 /**
- * MyFinance App - Core Logic (v3 - Optimized Camera & Drive)
+ * MyFinance App - Core Logic (Clean Revert)
  */
 
 const CONFIG = {
@@ -10,8 +10,7 @@ const CONFIG = {
 let state = {
     transactions: [],
     theme: localStorage.getItem('theme') || 'light',
-    activeSection: 'dashboard',
-    pendingImage: null
+    activeSection: 'dashboard'
 };
 
 // --- Initialization ---
@@ -21,7 +20,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initNavigation();
     initForms();
     initCharts();
-    initCameraHandlers();
     loadData();
     
     // Refresh App Button
@@ -66,23 +64,21 @@ function initNavigation() {
 
     navItems.forEach(item => {
         item.addEventListener('click', () => {
-            const target = item.getAttribute('data-section');
-            switchSection(target);
+            const targetSection = item.getAttribute('data-section');
+            if (targetSection === state.activeSection) return;
+
+            navItems.forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
+
+            sections.forEach(s => s.classList.remove('active'));
+            const targetEl = document.getElementById(`section-${targetSection}`);
+            if (targetEl) targetEl.classList.add('active');
+
+            state.activeSection = targetSection;
+            if (pageTitle) pageTitle.textContent = targetSection.charAt(0).toUpperCase() + targetSection.slice(1);
+            if (targetSection === 'statistik') renderDetailChart();
         });
     });
-}
-
-function switchSection(target) {
-    const navItems = document.querySelectorAll('.nav-item[data-section]');
-    const sections = document.querySelectorAll('.page-section');
-    const pageTitle = document.getElementById('page-title');
-
-    navItems.forEach(i => i.classList.toggle('active', i.getAttribute('data-section') === target));
-    sections.forEach(s => s.classList.toggle('active', s.id === `section-${target}`));
-    
-    state.activeSection = target;
-    if (pageTitle) pageTitle.textContent = target.charAt(0).toUpperCase() + target.slice(1);
-    if (target === 'statistik') renderDetailChart();
 }
 
 function initForms() {
@@ -99,17 +95,18 @@ function initForms() {
                 jenis: document.getElementById('t-type').value,
                 kategori: document.getElementById('t-category').value,
                 nominal: parseFloat(document.getElementById('t-amount').value),
-                catatan: document.getElementById('t-note').value,
-                image: state.pendingImage || null
+                catatan: document.getElementById('t-note').value
             };
 
             showToast('Menyimpan...');
             try {
-                const res = await fetch(CONFIG.API_URL, { method: 'POST', body: JSON.stringify(formData) });
+                const res = await fetch(CONFIG.API_URL, { 
+                    method: 'POST', 
+                    body: JSON.stringify(formData) 
+                });
                 const result = await res.json();
                 if (result.status === 'success') {
                     showToast('Berhasil disimpan!');
-                    clearPendingImage();
                     form.reset();
                     if (dateInput) dateInput.valueAsDate = new Date();
                     loadData();
@@ -120,122 +117,10 @@ function initForms() {
         });
     }
 
-    const removeBtn = document.getElementById('remove-receipt');
-    if (removeBtn) removeBtn.addEventListener('click', clearPendingImage);
-    
     const search = document.getElementById('search-input');
-    if (search) search.addEventListener('input', (e) => renderTransactionList(e.target.value.toLowerCase()));
-}
-
-function clearPendingImage() {
-    state.pendingImage = null;
-    const container = document.getElementById('receipt-preview-container');
-    if (container) container.style.display = 'none';
-}
-
-// --- Camera & Scan ---
-let cameraStream = null;
-
-function initCameraHandlers() {
-    const scanBtn = document.getElementById('nav-scan-trigger');
-    const closeBtn = document.getElementById('close-camera');
-    const shutterBtn = document.getElementById('shutter-btn');
-    
-    if (scanBtn) scanBtn.addEventListener('click', () => {
-        // Direct approach: If we are on mobile, use native camera by default for better compatibility
-        // unless they are specifically using a modern browser with good support.
-        if (isMobileDevice()) {
-            openNativeCamera();
-        } else {
-            startCamera();
-        }
-    });
-
-    if (closeBtn) closeBtn.addEventListener('click', stopCamera);
-    if (shutterBtn) shutterBtn.addEventListener('click', capturePhoto);
-}
-
-function isMobileDevice() {
-    return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-}
-
-async function startCamera() {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        openNativeCamera();
-        return;
+    if (search) {
+        search.addEventListener('input', (e) => renderTransactionList(e.target.value.toLowerCase()));
     }
-
-    const modal = document.getElementById('camera-modal');
-    const video = document.getElementById('camera-stream');
-
-    try {
-        cameraStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'environment' },
-            audio: false
-        });
-        video.srcObject = cameraStream;
-        modal.classList.add('active');
-    } catch (e) {
-        console.error(e);
-        openNativeCamera();
-    }
-}
-
-function openNativeCamera() {
-    showToast("Membuka Kamera...");
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.capture = 'environment'; // This triggers the real camera app on mobile
-    input.onchange = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (ev) => processScanResult(ev.target.result);
-            reader.readAsDataURL(file);
-        }
-    };
-    input.click();
-}
-
-function stopCamera() {
-    const modal = document.getElementById('camera-modal');
-    if (cameraStream) {
-        cameraStream.getTracks().forEach(t => t.stop());
-        cameraStream = null;
-    }
-    const video = document.getElementById('camera-stream');
-    if (video) video.srcObject = null;
-    modal.classList.remove('active');
-}
-
-async function capturePhoto() {
-    const video = document.getElementById('camera-stream');
-    const canvas = document.getElementById('capture-canvas');
-    if (!video || !video.videoWidth) return;
-
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0);
-    const base64 = canvas.toDataURL('image/jpeg', 0.8);
-    stopCamera();
-    processScanResult(base64);
-}
-
-function processScanResult(base64) {
-    state.pendingImage = base64;
-    
-    // UI Feedback
-    const preview = document.getElementById('receipt-preview');
-    const container = document.getElementById('receipt-preview-container');
-    if (preview && container) {
-        preview.src = base64;
-        container.style.display = 'block';
-    }
-
-    // Go to form
-    switchSection('transaksi');
-    showToast("Struk terbaca! Preview ada di form.");
 }
 
 // --- Data Management ---
@@ -278,12 +163,10 @@ function renderTransactionList(query = '') {
     filtered.forEach(t => {
         const item = document.createElement('div');
         item.className = 'transaction-item';
-        const photo = (t.foto && t.foto.startsWith('http')) ? `<a href="${t.foto}" target="_blank" class="t-photo-link" style="display:block; font-size:10px; color:var(--primary); margin-top:4px;">Lihat Struk</a>` : '';
         item.innerHTML = `
             <div class="t-info">
                 <span class="t-category">${t.kategori || 'Lainnya'}</span>
                 <span class="t-date">${new Date(t.tanggal).toLocaleDateString('id-ID')}</span>
-                ${photo}
             </div>
             <div class="t-amount ${t.jenis}">${t.jenis === 'pemasukan' ? '+' : '-'} ${formatCurrency(t.nominal)}</div>
         `;
@@ -313,13 +196,13 @@ function initCharts() {
 
     catChart = new Chart(catCtx, {
         type: 'doughnut',
-        data: { labels: [], datasets: [{ data: [] }] },
+        data: { labels: [], datasets: [{ data: [], backgroundColor: ['#4F46E5', '#06B6D4', '#10B981', '#F59E0B', '#EF4444'] }] },
         options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
     });
 
     trendChart = new Chart(trendCtx, {
         type: 'bar',
-        data: { labels: ['Pemasukan', 'Pengeluaran'], datasets: [{ data: [0, 0] }] },
+        data: { labels: ['Pemasukan', 'Pengeluaran'], datasets: [{ data: [0, 0], backgroundColor: ['#10B981', '#EF4444'] }] },
         options: { responsive: true, plugins: { legend: { display: false } } }
     });
 }
@@ -329,15 +212,13 @@ function updateCharts() {
     const expItems = state.transactions.filter(t => t.jenis === 'pengeluaran');
     const cats = {};
     expItems.forEach(i => { cats[i.kategori] = (cats[i.kategori] || 0) + (parseFloat(i.nominal) || 0); });
-    catChart.data.labels = Object.keys(cats).length ? Object.keys(cats) : ['Belum ada data'];
-    catChart.data.datasets[0].data = Object.values(cats).length ? Object.values(cats) : [0];
-    catChart.data.datasets[0].backgroundColor = ['#4F46E5', '#06B6D4', '#10B981', '#F59E0B', '#EF4444'];
+    catChart.data.labels = Object.keys(cats);
+    catChart.data.datasets[0].data = Object.values(cats);
     catChart.update();
 
     const inc = state.transactions.filter(t => t.jenis === 'pemasukan').reduce((s,t) => s+(parseFloat(t.nominal)||0), 0);
     const exp = state.transactions.filter(t => t.jenis === 'pengeluaran').reduce((s,t) => s+(parseFloat(t.nominal)||0), 0);
     trendChart.data.datasets[0].data = [inc, exp];
-    trendChart.data.datasets[0].backgroundColor = ['#10B981', '#EF4444'];
     trendChart.update();
 }
 
