@@ -133,12 +133,13 @@ function switchSection(target) {
     const navItems = document.querySelectorAll('.nav-item[data-section]');
     const sections = document.querySelectorAll('.page-section');
     const pageTitle = document.getElementById('page-title');
+    const titleMap = { dashboard: 'MyFinance', transaksi: 'Transaksi', statistik: 'Statistik', profil: 'Profil' };
 
     navItems.forEach(i => i.classList.toggle('active', i.getAttribute('data-section') === target));
     sections.forEach(s => s.classList.toggle('active', s.id === `section-${target}`));
     
     state.activeSection = target;
-    if (pageTitle) pageTitle.textContent = target.charAt(0).toUpperCase() + target.slice(1);
+    if (pageTitle) pageTitle.textContent = titleMap[target] || 'MyFinance';
     
     if (target === 'statistik') renderDetailChart();
     if (target === 'dashboard') updateUI();
@@ -293,12 +294,14 @@ function calculateSummary() {
         walletContainer.innerHTML = '';
         state.wallets.forEach(w => {
             const bal = walletBalances[w] || 0;
-            walletContainer.innerHTML += `
-                <div style="min-width: 140px; padding: 0.8rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; flex-shrink: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
-                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 2px;">${w}</div>
-                    <div style="font-size: 1rem; font-weight: 700; color: ${bal < 0 ? 'var(--expense)' : 'var(--text)'};">${formatCurrency(bal)}</div>
-                </div>
+            const card = document.createElement('div');
+            card.className = 'wallet-card'; // Add the new class
+            card.innerHTML = `
+                <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600; letter-spacing: 0.3px; text-transform: uppercase; margin-bottom: 4px;">${w}</div>
+                <div style="font-size: 0.95rem; font-weight: 800; color: ${bal < 0 ? 'var(--expense)' : 'var(--text)'}; letter-spacing: -0.3px;">${formatCurrency(bal)}</div>
             `;
+            card.style.cssText = 'min-width: 130px; padding: 0.85rem 1rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; flex-shrink: 0; box-shadow: var(--shadow-xs);';
+            walletContainer.appendChild(card);
         });
     }
 }

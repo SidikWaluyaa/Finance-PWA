@@ -1,15 +1,18 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>MyFinance</title>
+    <title>MyFinance — Personal Finance Manager</title>
+    <meta name="description" content="Kelola keuangan pribadi Anda dengan mudah. Catat transaksi, atur anggaran, dan pantau target tabungan.">
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#4F46E5">
+    <meta name="theme-color" content="#6366F1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
@@ -18,31 +21,37 @@
     <div id="app">
         <!-- Header -->
         <header class="app-header">
-            <h1 id="page-title">Dashboard</h1>
-            <button id="notification-btn" class="icon-btn">
+            <h1 id="page-title">MyFinance</h1>
+            <button id="notification-btn" class="icon-btn" aria-label="Notifications">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
             </button>
         </header>
 
         <!-- Main Content Area -->
         <main id="main-content">
-            <!-- Dashboard Section -->
+
+            <!-- ==================== DASHBOARD ==================== -->
             <section id="section-dashboard" class="page-section active">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <h2 style="font-size: 1.2rem;">Ringkasan Bulan</h2>
-                    <input type="month" id="global-date-filter" style="padding: 0.4rem; border-radius: 8px; border: 1px solid var(--border); font-family: inherit;">
+
+                <!-- Date Filter -->
+                <div class="date-filter-bar">
+                    <h2>Ringkasan</h2>
+                    <input type="month" id="global-date-filter">
                 </div>
+
+                <!-- Balance Card -->
                 <div class="summary-cards">
                     <div class="card primary-card">
-                        <span class="label">Total Saldo (Semua Dompet)</span>
+                        <span class="label">Total Saldo · Semua Dompet</span>
                         <h2 id="total-balance">Rp 0</h2>
                     </div>
-                    
-                    <!-- Wallet Balances -->
-                    <div id="wallet-balances" style="display: flex; gap: 10px; overflow-x: auto; padding-bottom: 5px; margin-bottom: 1rem; width: 100%;">
-                        <!-- Wallet cards will be injected here -->
+
+                    <!-- Wallet Balances (horizontal scroll) -->
+                    <div id="wallet-balances">
+                        <!-- Wallet mini-cards injected by JS -->
                     </div>
 
+                    <!-- Income / Expense -->
                     <div class="stats-row">
                         <div class="card income-card">
                             <span class="label">Pemasukan</span>
@@ -57,110 +66,107 @@
 
                 <!-- Budget Summary -->
                 <div class="card">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <h3 style="font-size: 1rem;">Anggaran Bulanan</h3>
-                        <span style="font-size: 0.75rem; color: var(--primary); cursor: pointer;" onclick="switchSection('profil')">Atur Limit</span>
+                    <div class="card-header">
+                        <h3>Anggaran Bulanan</h3>
+                        <button class="link-btn" onclick="switchSection('profil')">Atur Limit →</button>
                     </div>
                     <div id="budget-summary">
-                        <!-- Budget bars will be injected here -->
+                        <!-- Budget bars injected by JS -->
                     </div>
                 </div>
 
-                <!-- Savings Goals Summary -->
+                <!-- Savings Goals -->
                 <div class="card">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <h3 style="font-size: 1rem;">Target Tabungan (Goals)</h3>
-                        <span style="font-size: 0.75rem; color: var(--primary); cursor: pointer;" onclick="switchSection('profil')">Atur Target</span>
+                    <div class="card-header">
+                        <h3>Target Tabungan</h3>
+                        <button class="link-btn" onclick="switchSection('profil')">Atur Target →</button>
                     </div>
                     <div id="savings-summary">
-                        <!-- Savings Goal bars will be injected here -->
+                        <!-- Goals injected by JS -->
                     </div>
                 </div>
-                
-                <div class="chart-container card">
 
+                <!-- Charts -->
+                <div class="card chart-container">
                     <h3>Pengeluaran per Kategori</h3>
                     <canvas id="categoryChart"></canvas>
                 </div>
-                
-                <div class="chart-container card">
+
+                <div class="card chart-container">
                     <h3>Pemasukan vs Pengeluaran</h3>
                     <canvas id="trendChart"></canvas>
                 </div>
             </section>
 
-            <!-- Transaksi Section -->
+            <!-- ==================== TRANSAKSI ==================== -->
             <section id="section-transaksi" class="page-section">
                 <div class="card">
                     <form id="transaction-form">
                         <h3 id="form-title">Tambah Transaksi</h3>
                         <div class="form-group">
-                            <label>Tanggal</label>
+                            <label for="t-date">Tanggal</label>
                             <input type="date" id="t-date" required>
                         </div>
                         <div class="form-group">
-                            <label>Jenis</label>
+                            <label for="t-type">Jenis</label>
                             <select id="t-type" required>
                                 <option value="pemasukan">Pemasukan</option>
                                 <option value="pengeluaran">Pengeluaran</option>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Kategori</label>
+                            <label for="t-category">Kategori</label>
                             <select id="t-category" required>
                                 <option value="" disabled selected>Pilih Kategori...</option>
-                                <option value="Makanan">Makanan</option>
-                                <option value="Transportasi">Transportasi</option>
-                                <option value="Hiburan">Hiburan</option>
-                                <option value="Tagihan">Tagihan</option>
-                                <option value="Belanja">Belanja</option>
-                                <option value="Gaji">Gaji</option>
-                                <option value="Tabungan">Tabungan</option>
-                                <option value="Lainnya">Lainnya</option>
+                                <option value="Makanan">🍔 Makanan</option>
+                                <option value="Transportasi">🚗 Transportasi</option>
+                                <option value="Hiburan">🎬 Hiburan</option>
+                                <option value="Tagihan">📑 Tagihan</option>
+                                <option value="Belanja">🛍️ Belanja</option>
+                                <option value="Gaji">💰 Gaji</option>
+                                <option value="Tabungan">🏦 Tabungan</option>
+                                <option value="Lainnya">📦 Lainnya</option>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Dompet</label>
+                            <label for="t-wallet">Dompet</label>
                             <select id="t-wallet" required>
-                                <!-- Wallets injected here -->
+                                <!-- Wallets injected by JS -->
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Nominal</label>
+                            <label for="t-amount">Nominal</label>
                             <input type="number" id="t-amount" placeholder="0" required>
                         </div>
                         <div class="form-group">
-                            <label>Catatan</label>
+                            <label for="t-note">Catatan</label>
                             <textarea id="t-note" placeholder="Tambahkan catatan..."></textarea>
                         </div>
                         <div style="display: flex; gap: 0.5rem;">
                             <button type="submit" id="submit-btn" class="btn btn-primary">Simpan Transaksi</button>
-                            <button type="button" id="cancel-edit-btn" class="btn btn-outline" style="display: none;">Batal Edit</button>
+                            <button type="button" id="cancel-edit-btn" class="btn btn-outline" style="display: none;">Batal</button>
                         </div>
                     </form>
                 </div>
 
                 <div class="history-header">
                     <h3>Riwayat Transaksi</h3>
-                    <div class="filters">
-                        <input type="text" id="search-input" placeholder="Cari...">
-                    </div>
+                    <input type="text" id="search-input" placeholder="Cari...">
                 </div>
                 <div id="transaction-list" class="list-container">
-                    <!-- Transactions will be injected here -->
                     <div class="skeleton-list"></div>
                 </div>
             </section>
 
-            <!-- Statistik Section -->
+            <!-- ==================== STATISTIK ==================== -->
             <section id="section-statistik" class="page-section">
-                <div class="card">
+                <div class="card chart-container">
                     <h3>Statistik Detail</h3>
                     <canvas id="detailChart"></canvas>
                 </div>
             </section>
 
-            <!-- Profil Section -->
+            <!-- ==================== PROFIL ==================== -->
             <section id="section-profil" class="page-section">
                 <div class="profile-header card">
                     <div class="avatar">U</div>
@@ -169,49 +175,57 @@
                         <span id="user-email">user@example.com</span>
                     </div>
                 </div>
-                
+
+                <!-- Budget Manager -->
                 <div class="card">
-                    <h3>Atur Anggaran (Budget)</h3>
-                    <div class="form-group" style="margin-top: 1rem;">
-                        <select id="budget-category" style="margin-bottom: 0.5rem;" required>
-                            <option value="" disabled selected>Pilih Kategori Budget...</option>
-                            <option value="Makanan">Makanan</option>
-                            <option value="Transportasi">Transportasi</option>
-                            <option value="Hiburan">Hiburan</option>
-                            <option value="Tagihan">Tagihan</option>
-                            <option value="Belanja">Belanja</option>
-                            <option value="Lainnya">Lainnya</option>
+                    <h3>Atur Anggaran</h3>
+                    <div class="form-group" style="margin-top: 0.75rem;">
+                        <select id="budget-category" required>
+                            <option value="" disabled selected>Pilih Kategori...</option>
+                            <option value="Makanan">🍔 Makanan</option>
+                            <option value="Transportasi">🚗 Transportasi</option>
+                            <option value="Hiburan">🎬 Hiburan</option>
+                            <option value="Tagihan">📑 Tagihan</option>
+                            <option value="Belanja">🛍️ Belanja</option>
+                            <option value="Lainnya">📦 Lainnya</option>
                         </select>
-                        <input type="number" id="budget-limit" placeholder="Limit Nominal (misal: 1000000)">
-                        <button id="save-budget-btn" class="btn btn-secondary" style="margin-top: 0.5rem;" onclick="saveBudget()">Simpan Budget</button>
                     </div>
+                    <div class="form-group">
+                        <input type="number" id="budget-limit" placeholder="Limit nominal (contoh: 1000000)">
+                    </div>
+                    <button class="btn btn-secondary" onclick="saveBudget()">Simpan Anggaran</button>
                 </div>
 
+                <!-- Savings Goals Manager -->
                 <div class="card">
-                    <h3>Atur Target Tabungan (Goals)</h3>
-                    <div class="form-group" style="margin-top: 1rem;">
-                        <input type="text" id="goal-name" placeholder="Nama Target (misal: Beli Laptop)" style="margin-bottom: 0.5rem;" required>
-                        <input type="number" id="goal-target" placeholder="Target Nominal (misal: 10000000)" required>
-                        <button id="save-goal-btn" class="btn btn-secondary" style="margin-top: 0.5rem;" onclick="saveGoal()">Simpan Target</button>
+                    <h3>Atur Target Tabungan</h3>
+                    <div class="form-group" style="margin-top: 0.75rem;">
+                        <input type="text" id="goal-name" placeholder="Nama target (contoh: Beli Laptop)" required>
                     </div>
-                </div>
-                
-                <div class="card">
-                    <h3>Kelola Dompet (Wallets)</h3>
-                    <div id="wallet-list" style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem;">
-                        <!-- Wallet items injected here -->
+                    <div class="form-group">
+                        <input type="number" id="goal-target" placeholder="Target nominal (contoh: 10000000)" required>
                     </div>
-                    <div class="form-group" style="margin-top: 1rem;">
-                        <input type="text" id="new-wallet-name" placeholder="Tambah dompet baru (misal: BCA, OVO)" required>
-                        <button class="btn btn-secondary" style="margin-top: 0.5rem;" onclick="addWallet()">Tambah Dompet</button>
-                    </div>
+                    <button class="btn btn-secondary" onclick="saveGoal()">Simpan Target</button>
                 </div>
 
+                <!-- Wallet Manager -->
+                <div class="card">
+                    <h3>Kelola Dompet</h3>
+                    <div id="wallet-list" style="margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                        <!-- Wallet items injected by JS -->
+                    </div>
+                    <div class="form-group" style="margin-top: 1rem;">
+                        <input type="text" id="new-wallet-name" placeholder="Tambah dompet baru (contoh: BCA, OVO)" required>
+                    </div>
+                    <button class="btn btn-secondary" onclick="addWallet()">Tambah Dompet</button>
+                </div>
+
+                <!-- Settings -->
                 <div class="card settings-list">
                     <div class="setting-item" style="flex-direction: column; align-items: flex-start; gap: 0.5rem;">
                         <div style="display: flex; justify-content: space-between; width: 100%;">
                             <span>Ukuran Teks</span>
-                            <span id="zoom-level-text" style="color: var(--text-light); font-size: 0.85rem;">100%</span>
+                            <span id="zoom-level-text" style="color: var(--text-muted); font-size: 0.8rem;">100%</span>
                         </div>
                         <input type="range" id="zoom-slider" min="12" max="22" step="1" value="16">
                     </div>
@@ -224,34 +238,34 @@
                     </div>
                     <div class="setting-item">
                         <span>Laporan Keuangan</span>
-                        <button id="export-pdf-btn" class="btn btn-outline" style="width: auto; padding: 0.5rem 1rem;">Download PDF</button>
+                        <button id="export-pdf-btn" class="btn btn-outline" style="width: auto; padding: 0.45rem 1rem; font-size: 0.78rem;">Download PDF</button>
                     </div>
                     <div class="setting-item">
                         <span>Versi Aplikasi</span>
-                        <span style="color: var(--text-light);">v7.0.0</span>
+                        <span style="color: var(--text-muted); font-size: 0.8rem;">v9.0.0</span>
                     </div>
-                    <div class="setting-item">
-                        <button id="force-refresh-btn" class="btn btn-outline" style="margin-top: 1rem;">Update / Refresh App</button>
+                    <div class="setting-item" style="justify-content: center;">
+                        <button id="force-refresh-btn" class="btn btn-outline" style="font-size: 0.8rem;">Update / Refresh App</button>
                     </div>
                 </div>
             </section>
         </main>
 
         <!-- Bottom Navigation -->
-        <nav class="bottom-nav">
-            <button class="nav-item active" data-section="dashboard">
+        <nav class="bottom-nav" aria-label="Main Navigation">
+            <button class="nav-item active" data-section="dashboard" aria-label="Beranda">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
                 <span>Beranda</span>
             </button>
-            <button class="nav-item" data-section="transaksi">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            <button class="nav-item" data-section="transaksi" aria-label="Transaksi">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
                 <span>Transaksi</span>
             </button>
-            <button class="nav-item" data-section="statistik">
+            <button class="nav-item" data-section="statistik" aria-label="Statistik">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
                 <span>Statistik</span>
             </button>
-            <button class="nav-item" data-section="profil">
+            <button class="nav-item" data-section="profil" aria-label="Profil">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                 <span>Profil</span>
             </button>
