@@ -324,7 +324,7 @@ main::-webkit-scrollbar { display: none; }
 
 
 /* Budget Progress Bars */
-.budget-item { margin-bottom: 1.25rem; }
+.budget-item { margin-bottom: 1.25rem; position: relative; }
 .budget-label {
     display: flex;
     justify-content: space-between;
@@ -332,6 +332,17 @@ main::-webkit-scrollbar { display: none; }
     margin-bottom: 0.5rem;
     font-weight: 600;
     color: var(--text);
+    align-items: center;
+}
+.budget-label .btn-delete {
+    margin-left: 0.5rem;
+    padding: 0.2rem;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--expense);
+}
+.budget-label .btn-delete:hover {
+    background: #FEE2E2;
 }
 .progress-bar {
     height: 10px;

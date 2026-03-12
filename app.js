@@ -317,18 +317,30 @@ function renderBudgetInfo() {
 
         const el = document.createElement('div');
         el.className = 'budget-item';
+        
         el.innerHTML = `
-            <div class="budget-label" style="align-items: center;">
-                <span>${cat.charAt(0).toUpperCase() + cat.slice(1)}</span>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <span>${formatCurrency(spent)} / ${formatCurrency(limit)}</span>
-                    <button onclick="deleteBudget('${cat}')" class="btn-icon-xs btn-delete">🗑️</button>
+            <div class="budget-label" style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-weight: 700;">${cat.charAt(0).toUpperCase() + cat.slice(1)}</span>
+                <div class="budget-actions" style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 0.85rem;">${formatCurrency(spent)} / ${formatCurrency(limit)}</span>
                 </div>
             </div>
-            <div class="progress-bar">
+            <div class="progress-bar" style="margin-top: 5px;">
                 <div class="progress-fill" style="width: ${percent}%; background: ${color}"></div>
             </div>
         `;
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.innerHTML = '🗑️';
+        deleteBtn.className = 'btn-icon-xs btn-delete';
+        deleteBtn.style.padding = '0';
+        deleteBtn.style.width = '28px';
+        deleteBtn.style.height = '28px';
+        deleteBtn.title = 'Hapus Anggaran';
+        deleteBtn.onclick = () => deleteBudget(cat);
+        
+        el.querySelector('.budget-actions').appendChild(deleteBtn);
+        
         container.appendChild(el);
     });
 }
