@@ -85,17 +85,17 @@
                         </div>
                         <div class="form-group">
                             <label>Kategori</label>
-                            <input type="text" id="t-category" list="category-options" placeholder="e.g. Makanan, Gaji" required>
-                            <datalist id="category-options">
-                                <option value="Makanan">
-                                <option value="Minuman">
-                                <option value="Transport">
-                                <option value="Belanja">
-                                <option value="Hiburan">
-                                <option value="Kesehatan">
-                                <option value="Tagihan">
-                                <option value="Gaji">
-                            </datalist>
+                            <select id="t-category" required>
+                                <option value="" disabled selected>Pilih Kategori...</option>
+                                <option value="Makanan">Makanan</option>
+                                <option value="Transportasi">Transportasi</option>
+                                <option value="Hiburan">Hiburan</option>
+                                <option value="Tagihan">Tagihan</option>
+                                <option value="Belanja">Belanja</option>
+                                <option value="Gaji">Gaji</option>
+                                <option value="Tabungan">Tabungan</option>
+                                <option value="Lainnya">Lainnya</option>
+                            </select>
                         </div>
                         <div class="form-group">
                             <label>Nominal</label>
@@ -145,7 +145,15 @@
                 <div class="card">
                     <h3>Atur Anggaran (Budget)</h3>
                     <div class="form-group" style="margin-top: 1rem;">
-                        <input type="text" id="budget-category" placeholder="Nama Kategori (misal: Makanan)" style="margin-bottom: 0.5rem;">
+                        <select id="budget-category" style="margin-bottom: 0.5rem;" required>
+                            <option value="" disabled selected>Pilih Kategori Budget...</option>
+                            <option value="Makanan">Makanan</option>
+                            <option value="Transportasi">Transportasi</option>
+                            <option value="Hiburan">Hiburan</option>
+                            <option value="Tagihan">Tagihan</option>
+                            <option value="Belanja">Belanja</option>
+                            <option value="Lainnya">Lainnya</option>
+                        </select>
                         <input type="number" id="budget-limit" placeholder="Limit Nominal (misal: 1000000)">
                         <button id="save-budget-btn" class="btn btn-secondary" style="margin-top: 0.5rem;">Simpan Budget</button>
                     </div>
